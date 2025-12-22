@@ -121,7 +121,7 @@ import { t, defineTable, Engine } from '@housekit/orm';
 
 export const logs = defineTable('logs', {
     id: t.uuid('id').autoGenerate().primaryKey(),
-    message: t.text('message').comment('Log message content'),
+    message: t.string('message').comment('Log message content'),
     level: t.enum('level', ['info', 'warning', 'error']).default('info').comment('Log severity level'),
     tags: t.array(t.string('tag')).nullable().comment('Array of tags for categorizing logs'),
     metadata: t.json('metadata').nullable().comment('Additional log metadata'),
