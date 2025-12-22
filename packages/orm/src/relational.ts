@@ -1,9 +1,33 @@
 import { ClickHouseQueryBuilder } from './builders/select';
 import { SQL } from './expressions';
-import { sql } from './expressions';
-import { and } from './modules/conditional';
+import * as ops from './expressions';
+import * as cond from './modules/conditional';
 import { ClickHouseColumn, type RelationDefinition, type TableDefinition } from './core';
 import type { SQLExpression } from './expressions';
+
+const operators = {
+    eq: ops.eq,
+    ne: ops.ne,
+    gt: ops.gt,
+    gte: ops.gte,
+    lt: ops.lt,
+    lte: ops.lte,
+    inArray: ops.inArray,
+    notInArray: ops.notInArray,
+    between: ops.between,
+    notBetween: ops.notBetween,
+    has: ops.has,
+    hasAll: ops.hasAll,
+    hasAny: ops.hasAny,
+    sql: ops.sql,
+    and: cond.and,
+    or: cond.or,
+    not: cond.not,
+    isNull: cond.isNull,
+    isNotNull: cond.isNotNull,
+};
+
+type Operators = typeof operators;
 
 /**
  * Join strategy for relational queries
@@ -36,11 +60,11 @@ export type RelationalFindOptions<TTable = any> = {
 
 function buildJoinCondition(fields: ClickHouseColumn[] | undefined, references: ClickHouseColumn[] | undefined): SQLExpression | null {
     if (!fields || !references || fields.length === 0 || references.length === 0) return null;
-    const pairs = fields.map((f, i) => sql`${f} = ${references[i]}`);
+    const pairs = fields.map((f, i) => ops.sql`${f} = ${references[i]}`);
     const filtered = pairs.filter((p): p is SQL => Boolean(p));
     if (filtered.length === 0) return null;
     if (filtered.length === 1) return filtered[0];
-    const combined = and(...filtered);
+    const combined = cond.and(...filtered);
     return combined || null;
 }
 
@@ -73,7 +97,7 @@ export function buildRelationalAPI(client: any, schema?: Record<string, TableDef
                 const selection: Record<string, any> = {};
                 baseColumns.forEach(([key, col]) => { selection[key] = col; });
 
-                const relations = (tableDef as any).$relations as Record<string, RelationDefinition> | undefined; // Re-introduced
+                const relations = (tableDef as any).$relations as Record<string, RelationDefinition> | undefined;
 
                 const requestedTopLevel = opts?.with ? Object.entries(opts.with).filter(([, v]) => v) : [];
 
@@ -129,8 +153,14 @@ export function buildRelationalAPI(client: any, schema?: Record<string, TableDef
                     for (const { relName, rel, options } of requestedNested) {
                         const newPrefix = prefix ? `${prefix}_${relName}_` : `${relName}_`;
 
+                        // Resolve relation filter (where)
+                        const relWhere = options.where
+                            ? (typeof options.where === 'function' ? options.where(rel.table.$columns) : options.where)
+                            : null;
+
                         // Add join for this relation
-                        const joinCondition = buildJoinCondition(rel.fields, rel.references);
+                        let joinCondition = buildJoinCondition(rel.fields, rel.references);
+
                         if (joinCondition) {
                             const joinType = (() => {
                                 const relIsDistributed = isDistributedTable(rel.table);
@@ -149,17 +179,25 @@ export function buildRelationalAPI(client: any, schema?: Record<string, TableDef
                             if (rel.relation === 'many' && !prefix) {
                                 // For 'many' relations at top level, we add a groupArray(tuple(...)) selection
                                 const relCols = Object.entries(rel.table.$columns);
-                                const tupleArgs = relCols.map(([, col]) => sql`${col}`);
-                                currentSelection[relName] = sql`groupArray(tuple(${sql.join(tupleArgs, sql`, `)}))`;
+                                const tupleArgs = relCols.map(([, col]) => ops.sql`${col}`);
+
+                                if (relWhere) {
+                                    // Use groupArrayIf for filtering
+                                    currentSelection[relName] = ops.sql`groupArrayIf(tuple(${ops.sql.join(tupleArgs, ops.sql`, `)}), ${relWhere})`;
+                                } else {
+                                    currentSelection[relName] = ops.sql`groupArray(tuple(${ops.sql.join(tupleArgs, ops.sql`, `)}))`;
+                                }
+                            } else {
+                                // If it's a 'one' relation or nested 'many', we might need to add filter to join condition
+                                if (relWhere && rel.relation === 'one') {
+                                    joinCondition = cond.and(joinCondition, relWhere) as SQLExpression;
+                                }
                             }
 
                             currentJoins.push({ type: joinType, table: rel.table, on: joinCondition });
                         }
 
                         // Recursively build selection for nested relations
-                        // If it's a 'one' relation, we continue flat selection
-                        // If it's a 'many' relation and we already optimized it via groupArray, 
-                        // we don't need to add its columns to the flat selection.
                         if (rel.relation === 'one') {
                             const nestedResult = buildNestedSelection(rel.table, options.with, newPrefix, outerJoinStrategy, outerUseGlobal, outerUseAny, isInsideMany);
                             Object.assign(currentSelection, nestedResult.selection);
@@ -305,4 +343,3 @@ export function buildRelationalAPI(client: any, schema?: Record<string, TableDef
 
     return api;
 }
-

@@ -178,6 +178,37 @@ export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns
     }
 
     /**
+     * Add a row to the background batcher.
+     * 
+     * If batching is not yet configured, it will use default settings
+     * (10,000 rows or 5 seconds).
+     * 
+     * Note: This method is "fire-and-forget" and does not wait for 
+     * the database to acknowledge the insert.
+     */
+    async append(row: TableInsert<TTable['$columns']>) {
+        if (!this._batchConfig) {
+            this.batch();
+        }
+
+        const plan = buildInsertPlan(this.table);
+        const batcher = globalBatcher(this.client);
+
+        // We temporarily set _values to this single row to reuse processRows logic
+        const oldValues = this._values;
+        this._values = [row];
+
+        try {
+            const rowIterator = this.processRows(plan);
+            for await (const processedRow of rowIterator) {
+                batcher.add(this.table, processedRow, this._batchConfig!);
+            }
+        } finally {
+            this._values = oldValues;
+        }
+    }
+
+    /**
      * Force JSON format (useful for debugging or compatibility).
      * 
      * Note: HouseKit uses RowBinary by default for maximum performance.

@@ -15,7 +15,7 @@ The high-performance core.
 - **Turbo Mode**: Native `RowBinary` serialization for 5-10x faster inserts than JSON.
 - **Type-Safe DSL**: Fully typed query builder and schema definition.
 - **Relational API**: Optimized one-to-many and one-to-one fetching using ClickHouse's `groupArray`.
-- **Background Batching**: Built-in client-side buffering for high-throughput writes.
+- **Background Batching**: Use `.batch()` and `.append(row)` for ultra-low latency, high-throughput writes.
 
 ### [2. housekit (CLI)](./packages/kit)
 The schema management and migration tool.

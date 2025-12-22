@@ -43,7 +43,7 @@
         "README.md"
     ],
     "scripts": {
-        "build": "bun build ./src/index.ts --outdir ./dist --target node --external \"*\" && tsc --project tsconfig.build.json && mv dist/packages/kit/src/* dist/ && rm -rf dist/packages",
+        "build": "bun build ./src/index.ts --outdir ./dist --target node --external \"*\" && tsc --project tsconfig.build.json && cp -r dist/packages/kit/src/* dist/ && rm -rf dist/packages",
         "clean": "rm -rf dist"
     },
     "dependencies": {

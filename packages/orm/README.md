@@ -152,9 +152,10 @@ const builder = db.insert(webEvents)
     flushIntervalMs: 5000 
   });
 
-// These calls return immediately, flushing happens in the background
-builder.values(row1).execute();
-builder.values(row2).execute();
+// Add rows to the background queue.
+// Proccessing and flushing happen automatically.
+await builder.append(row1);
+await builder.append(row2);
 ```
 
 ---
