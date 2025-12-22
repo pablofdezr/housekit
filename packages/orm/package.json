@@ -1,6 +1,6 @@
 {
     "name": "@housekit/orm",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Type-safe ClickHouse ORM with modern DX and ClickHouse-specific optimizations. Features Turbo Mode (RowBinary), full engine support, and advanced query capabilities.",
     "type": "module",
     "main": "./dist/index.js",
