@@ -71,11 +71,10 @@ The standard for CI/CD and production environments.
 Create a `housekit.config.ts` (or `.js`, `.mjs`) in your project root.
 
 ```typescript
-import type { HouseKitConfig } from 'housekit';
+import type { HouseKitConfig } from '@housekit/kit';
 
 export default {
-  // Path to your table/view definitions
-  schema: './src/schema',
+  schema: './src/schema', // Where your table definitions live
   
   // Where migrations and snapshots will be stored
   out: './housekit',

@@ -73,7 +73,7 @@ export async function initCommand() {
     // Create config file
     const configPath = `housekit.config.${fileType}`;
     const configContent = fileType === 'ts'
-        ? `import type { HouseKitConfig } from 'housekit';
+        ? `import type { HouseKitConfig } from '@housekit/kit';
 
 export default {
     schema: "${schemaPath}",
