@@ -145,3 +145,5 @@ program.command('validate')
     .action(withErrorHandling(validateCommand));
 
 program.command('help').description('Show help').action(() => program.outputHelp());
+
+await program.parseAsync(process.argv);
