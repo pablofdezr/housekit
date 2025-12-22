@@ -2,6 +2,8 @@
 
 **The high-performance, type-safe ClickHouse ORM for Node.js and Bun.**
 
+> ⚠️ **Public Beta**: This package is currently in public beta. Feedback is highly appreciated as we polish the API for v1.0.
+
 HouseKit ORM is a modern database toolkit designed specifically for ClickHouse. It bridges the gap between ergonomic developer experiences and the extreme performance requirements of high-volume OLAP workloads.
 
 [![npm version](https://img.shields.io/npm/v/@housekit/orm.svg)](https://www.npmjs.com/package/@housekit/orm)
@@ -178,6 +180,30 @@ const usersWithData = await db.query.users.findMany({
 
 // Result structure:
 // [{ id: 1, name: 'Alice', posts: [{ title: '...', ... }], profile: { bio: '...' } }]
+```
+
+### Advanced Relational Engine
+HouseKit's relational API is optimized for ClickHouse:
+- **Filtered Relations**: Where clauses in `with` blocks are executed server-side using `groupUniqArrayIf`.
+- **Nested Pagination**: Control the size of related collections with `limit` and `offset` directly in the relation config.
+- **Smart Deduplication**: Merges results in-memory to handle row multiplication from complex joins.
+
+---
+
+## 🛠 SQL Utilities
+
+### Dynamic Queries with `sql.join`
+Easily build complex queries by joining SQL fragments with separators.
+
+```typescript
+const conditions = [
+  eq(users.active, true),
+  gte(users.age, 18)
+];
+
+const query = db.select()
+  .from(users)
+  .where(sql.join(conditions, sql` AND `));
 ```
 
 ---

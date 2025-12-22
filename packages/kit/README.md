@@ -2,6 +2,8 @@
 
 **The modern schema management tool for ClickHouse.**
 
+> ⚠️ **Public Beta**: HouseKit CLI is currently in public beta. We are actively refining the migration engine and cluster management features.
+
 HouseKit CLI brings a modern, streamlined developer experience to the ClickHouse ecosystem. Manage your sharded clusters, analytical tables, and complex materialized views using purely TypeScript—no more manual SQL migration files or structural drift.
 
 [![npm version](https://img.shields.io/npm/v/@housekit/kit.svg)](https://www.npmjs.com/package/@housekit/kit)
