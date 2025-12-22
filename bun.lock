@@ -12,14 +12,14 @@
       },
     },
     "packages/kit": {
-      "name": "housekit",
-      "version": "1.0.0",
+      "name": "@housekit/kit",
+      "version": "0.1.10",
       "bin": {
-        "housekit": "./dist/index.js",
+        "housekit": "dist/index.js",
       },
       "dependencies": {
         "@clickhouse/client": "^1.14.0",
-        "@housekit/orm": "workspace:*",
+        "@housekit/orm": "^0.1.10",
         "chalk": "^5.6.2",
         "cli-table3": "^0.6.5",
         "commander": "^12.0.0",
@@ -35,7 +35,7 @@
     },
     "packages/orm": {
       "name": "@housekit/orm",
-      "version": "1.0.0",
+      "version": "0.1.10",
       "dependencies": {
         "uuid": "^13.0.0",
         "zod": "^4.2.1",
@@ -56,6 +56,8 @@
     "@clickhouse/client-common": ["@clickhouse/client-common@1.14.0", "", {}, "sha512-CyUcv2iCkZ1A++vmOSufYRpHR3aAWVfbrWed7ATzf0yyx/BW/2SEqlL07vBpSRa3BIkQe/DSOHVv8JkWZpUOwQ=="],
 
     "@colors/colors": ["@colors/colors@1.5.0", "", {}, "sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ=="],
+
+    "@housekit/kit": ["@housekit/kit@workspace:packages/kit"],
 
     "@housekit/orm": ["@housekit/orm@workspace:packages/orm"],
 
@@ -138,8 +140,6 @@
     "get-east-asian-width": ["get-east-asian-width@1.4.0", "", {}, "sha512-QZjmEOC+IT1uk6Rx0sX22V6uHWVwbdbxf1faPqJ1QhLdGgsRGCZoyaQBm/piRdJy/D2um6hM1UP7ZEeQ4EkP+Q=="],
 
     "glob": ["glob@10.5.0", "", { "dependencies": { "foreground-child": "^3.1.0", "jackspeak": "^3.1.2", "minimatch": "^9.0.4", "minipass": "^7.1.2", "package-json-from-dist": "^1.0.0", "path-scurry": "^1.11.1" }, "bin": { "glob": "dist/esm/bin.mjs" } }, "sha512-DfXN8DfhJ7NH3Oe7cFmu3NCu1wKbkReJ8TorzSAFbSKrlNaQSKfIzqYqVY8zlbs2NLBbWpRiU52GX2PbaBVNkg=="],
-
-    "housekit": ["housekit@workspace:packages/kit"],
 
     "iconv-lite": ["iconv-lite@0.7.0", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-cf6L2Ds3h57VVmkZe+Pn+5APsT7FpqJtEhhieDCvrE2MK5Qk9MyffgQyuxQTm6BChfeZNtcOLHp9IcWRVcIcBQ=="],
 
