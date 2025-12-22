@@ -4,7 +4,7 @@
 
 HouseKit CLI brings a modern, streamlined developer experience to the ClickHouse ecosystem. Manage your sharded clusters, analytical tables, and complex materialized views using purely TypeScript—no more manual SQL migration files or structural drift.
 
-[![npm version](https://img.shields.io/npm/v/housekit.svg)](https://www.npmjs.com/package/housekit)
+[![npm version](https://img.shields.io/npm/v/@housekit/kit.svg)](https://www.npmjs.com/package/@housekit/kit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
