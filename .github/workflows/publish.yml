@@ -13,8 +13,6 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Needed for committing version bumps
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,32 +33,7 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Bump Versions
-        id: bump
-        run: node scripts/bump-changed-versions.cjs
+      - name: Publish to NPM (if version changed)
+        run: npm run release:publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Build Packages
-        run: bun run build:packages
-
-      - name: Publish to NPM
-        run: node scripts/publish-changed.cjs
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Commit and push version updates
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          # Añadimos todo lo modificado por el build (package.json, workers generados, etc)
-          git add .
-          # Solo procedemos si hay algo que commitear
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: bump versions [skip ci]"
-            git pull --rebase origin main
-            git push origin main
-          else
-            echo "No changes to commit"
-          fi
-

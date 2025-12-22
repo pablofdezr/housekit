@@ -1,4 +1,4 @@
-import type { HouseKitConfig } from 'housekit';
+import type { HouseKitConfig } from '@housekit/orm';
 
 /**
  * HouseKit Configuration File

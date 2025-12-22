@@ -6,6 +6,7 @@ import { createClientFromConfigObject, type ClientConfigWithSchema } from './cli
 
 // Export core types and utilities explicitly
 export { ClickHouseColumn } from './column';
+export type { HouseKitConfig } from './config';
 export {
     type TableDefinition,
     type TableColumns,
