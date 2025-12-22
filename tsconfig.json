@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@housekit/orm": [
+        "./packages/orm/src/index.ts"
+      ],
+      "housekit": [
+        "./packages/kit/src/index.ts"
+      ]
+    }
+  }
+}

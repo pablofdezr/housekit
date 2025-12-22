@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+out/
+*.tgz
+
+# Code coverage
+coverage/
+*.lcov
+
+# Logs
+logs/
+*.log
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Credentials (Local Only)
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# Caches
+.eslintcache
+.cache
+*.tsbuildinfo
+.turbo/
+.turbo.bumped-packages.json
+
+# IDEs and System
+.idea/
+.cursor/
+.DS_Store
+
+# Temporary / Development Files
+all.txt
+reproduce_phase3.ts
+.housekit/
+
+# Note: scripts/, examples/, tests/, config files and .npmignore 
+# are intentionally NOT ignored so they stay public.
+
+# Other files
+cat.js
+CLAUDE.md
+.gemini

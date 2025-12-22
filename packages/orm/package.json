@@ -1,0 +1,68 @@
+{
+    "name": "@housekit/orm",
+    "version": "0.1.0",
+    "description": "Type-safe ClickHouse ORM with modern DX and ClickHouse-specific optimizations. Features Turbo Mode (RowBinary), full engine support, and advanced query capabilities.",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "license": "MIT",
+    "author": "Pablo Fernandez Ruiz",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/pablofdezr/housekit.git",
+        "directory": "packages/orm"
+    },
+    "homepage": "https://github.com/pablofdezr/housekit#readme",
+    "bugs": {
+        "url": "https://github.com/pablofdezr/housekit/issues"
+    },
+    "keywords": [
+        "clickhouse",
+        "orm",
+        "typescript",
+        "type-safe",
+        "query-builder",
+        "database",
+        "sql",
+        "analytics",
+        "olap",
+        "drizzle",
+        "turbo-mode",
+        "rowbinary"
+    ],
+    "files": [
+        "dist/**/*",
+        "LICENSE",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "bun run build-worker.ts && bun build ./src/index.ts --outdir ./dist --target node --external \"*\" && tsc --project tsconfig.build.json",
+        "prepublishOnly": "bun run build",
+        "clean": "rm -rf dist"
+    },
+    "dependencies": {
+        "uuid": "^13.0.0",
+        "zod": "^4.2.1"
+    },
+    "peerDependencies": {
+        "@clickhouse/client": "^1.0.0"
+    },
+    "devDependencies": {
+        "@clickhouse/client": "^1.14.0",
+        "@types/uuid": "^11.0.0",
+        "typescript": "^5.0.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}

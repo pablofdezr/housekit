@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Source and Development
+src/
+tests/
+examples/
+scripts/
+build-worker.ts
+reproduce_phase3.ts
+all.txt
+cat.js
+
+# Code coverage
+coverage/
+*.lcov
+
+# Logs
+logs/
+*.log
+report.*.json
+
+# Credentials and Env
+.env*
+
+# Caches and Configs
+tsconfig.json
+tsconfig.build.json
+*.tsbuildinfo
+.eslintcache
+.cache
+
+# IDEs and System
+.idea/
+.cursor/
+.DS_Store
+CLAUDE.md
+
+# CI/CD and Release Meta
+.github/
+.gemini/
+.turbo/
+.turbo.bumped-packages.json
+RELEASE.md
+*.tgz
+
+# HouseKit CLI outputs
+.housekit/

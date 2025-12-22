@@ -1,0 +1,150 @@
+import { ClickHouseColumn } from './column';
+export type JsonValue = Record<string, any> | any[];
+export declare const int8: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const int16: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const integer: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const int32: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const int64: (name: string) => ClickHouseColumn<number, true, false>;
+/**
+ * ⚠️ Advanced: Very wide integer type (128-bit).
+ * Use only if you need to store numbers larger than 2^63-1.
+ * For most cases, `int64` is sufficient.
+ */
+export declare const int128: (name: string) => ClickHouseColumn<number, true, false>;
+/**
+ * ⚠️ Advanced: Extremely wide integer type (256-bit).
+ * Use only if you need to store numbers larger than 2^127-1.
+ * For most cases, `int64` is sufficient.
+ */
+export declare const int256: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const uint8: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const uint16: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const uint32: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const uint64: (name: string) => ClickHouseColumn<number, true, false>;
+/**
+ * ⚠️ Advanced: Very wide unsigned integer type (128-bit).
+ * Use only if you need to store numbers larger than 2^64-1.
+ * For most cases, `uint64` is sufficient.
+ */
+export declare const uint128: (name: string) => ClickHouseColumn<number, true, false>;
+/**
+ * ⚠️ Advanced: Extremely wide unsigned integer type (256-bit).
+ * Use only if you need to store numbers larger than 2^128-1.
+ * For most cases, `uint64` is sufficient.
+ */
+export declare const uint256: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const float32: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const float: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const float64: (name: string) => ClickHouseColumn<number, true, false>;
+/**
+ * ⚠️ Advanced: Brain Floating Point (16-bit).
+ * Primarily used for machine learning applications.
+ * Lower precision than `float32`. Use only if you know exactly why.
+ */
+export declare const bfloat16: (name: string) => ClickHouseColumn<number, true, false>;
+export declare const decimal: (name: string, precision?: number, scale?: number) => ClickHouseColumn<number, true, false>;
+export declare const decimal32: (name: string, scale?: number) => ClickHouseColumn<number, true, false>;
+export declare const decimal64: (name: string, scale?: number) => ClickHouseColumn<number, true, false>;
+/**
+ * ⚠️ Advanced: High precision decimal.
+ * Use only if you need more precision than `decimal64`.
+ */
+export declare const decimal128: (name: string, scale?: number) => ClickHouseColumn<number, true, false>;
+/**
+ * ⚠️ Advanced: Extreme precision decimal.
+ * Use only if you need more precision than `decimal128`.
+ */
+export declare const decimal256: (name: string, scale?: number) => ClickHouseColumn<number, true, false>;
+export declare const text: (name: string) => ClickHouseColumn<string, true, false>;
+export declare const string: (name: string) => ClickHouseColumn<string, true, false>;
+export declare const fixedString: (name: string, length: number) => ClickHouseColumn<string, true, false>;
+export declare const date: (name: string) => ClickHouseColumn<string | Date, true, false>;
+export declare const date32: (name: string) => ClickHouseColumn<string | Date, true, false>;
+export declare const timestamp: (name: string, timezone?: string) => ClickHouseColumn<string | Date, true, false>;
+export declare const datetime: (name: string, timezone?: string) => ClickHouseColumn<string | Date, true, false>;
+export declare const datetime64: (name: string, precision?: number, timezone?: string) => ClickHouseColumn<string | Date, true, false>;
+export declare const boolean: (name: string) => ClickHouseColumn<boolean, true, false>;
+export declare const bool: (name: string) => ClickHouseColumn<boolean, true, false>;
+export declare const uuid: (name: string) => ClickHouseColumn<string, true, false>;
+export declare const ipv4: (name: string) => ClickHouseColumn<string, true, false>;
+export declare const ipv6: (name: string) => ClickHouseColumn<string, true, false>;
+export declare const array: <T>(col: ClickHouseColumn<T>) => ClickHouseColumn<T[], true, false>;
+export declare const tuple: (name: string, types: string[]) => ClickHouseColumn<any, true, false>;
+export declare const map: (name: string, keyType?: string, valueType?: string) => ClickHouseColumn<Record<string, any>, true, false>;
+export declare const nested: (name: string, fields: Record<string, string>) => ClickHouseColumn<any, true, false>;
+export declare const nullable: <T, TNotNull extends boolean, TAutoGenerated extends boolean>(col: ClickHouseColumn<T, TNotNull, TAutoGenerated>) => ClickHouseColumn<T, false, TAutoGenerated>;
+export declare const lowCardinality: <T, TNotNull extends boolean, TAutoGenerated extends boolean>(col: ClickHouseColumn<T, TNotNull, TAutoGenerated>) => ClickHouseColumn<T, TNotNull, TAutoGenerated>;
+export declare const json: <TSchema = JsonValue>(name: string) => ClickHouseColumn<TSchema, false, false>;
+/**
+ * ⚠️ Advanced: Dynamic typing (experimental/niche).
+ * Allows storing values of different types in the same column.
+ * This is still evolving in ClickHouse. Use with caution.
+ */
+export declare const dynamic: (name: string, maxTypes?: number) => ClickHouseColumn<any, true, false>;
+export declare const aggregateFunction: (name: string, funcName: string, ...argTypes: string[]) => ClickHouseColumn<any, true, false>;
+export declare const simpleAggregateFunction: (name: string, funcName: string, argType: string) => ClickHouseColumn<any, true, false>;
+export declare const point: (name: string) => ClickHouseColumn<[number, number], true, false>;
+export declare const ring: (name: string) => ClickHouseColumn<[number, number][], true, false>;
+export declare const polygon: (name: string) => ClickHouseColumn<[number, number][][], true, false>;
+export declare const multiPolygon: (name: string) => ClickHouseColumn<[number, number][][][], true, false>;
+export declare const varchar: (name: string, opts?: {
+    length?: number;
+}) => ClickHouseColumn<string, true, false>;
+export declare const enumType: (name: string, values: readonly string[]) => ClickHouseColumn<string, false, false>;
+export interface TTLRule {
+    expression: string;
+    action?: 'DELETE' | 'TO DISK' | 'TO VOLUME';
+    target?: string;
+}
+export declare const ttl: {
+    /**
+     * Delete rows after a time interval
+     * @example ttl.delete(events.timestamp, { days: 30 })
+     */
+    delete: (column: ClickHouseColumn, interval: {
+        days?: number;
+        hours?: number;
+        months?: number;
+        years?: number;
+    }) => TTLRule;
+    /**
+     * Move rows to cold storage after a time interval
+     * @example ttl.toDisk(events.timestamp, { days: 7 }, 'cold_storage')
+     */
+    toDisk: (column: ClickHouseColumn, interval: {
+        days?: number;
+        hours?: number;
+        months?: number;
+        years?: number;
+    }, disk: string) => TTLRule;
+    /**
+     * Move rows to a volume after a time interval
+     * @example ttl.toVolume(events.timestamp, { days: 30 }, 'archive')
+     */
+    toVolume: (column: ClickHouseColumn, interval: {
+        days?: number;
+        hours?: number;
+        months?: number;
+        years?: number;
+    }, volume: string) => TTLRule;
+    /**
+     * Custom TTL expression
+     * @example ttl.custom('created_at + INTERVAL 1 YEAR')
+     */
+    custom: (expression: string) => TTLRule;
+    /**
+     * Combine multiple TTL rules (tiered storage)
+     * @example ttl.tiered(events.timestamp, [
+     *   { days: 7, action: 'toDisk', target: 'cold' },
+     *   { days: 30, action: 'delete' }
+     * ])
+     */
+    tiered: (column: ClickHouseColumn, tiers: Array<{
+        days?: number;
+        hours?: number;
+        months?: number;
+        years?: number;
+        action: "delete" | "toDisk" | "toVolume";
+        target?: string;
+    }>) => TTLRule[];
+};

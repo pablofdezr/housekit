@@ -1,0 +1,33 @@
+{
+  "name": "housekit-monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "author": "Pablo Fernandez Ruiz",
+  "license": "MIT",
+  "workspaces": [
+    "packages/orm",
+    "packages/kit",
+    "apps/*"
+  ],
+  "packageManager": "bun@1.0.0",
+  "scripts": {
+    "build": "turbo run build",
+    "clean": "turbo run clean",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "build:packages": "turbo run build --filter=@housekit/orm --filter=@housekit/kit",
+    "release:orm": "node scripts/bump-orm-version.cjs && bun run build:packages && cd packages/orm && npm publish --access=public",
+    "release:kit": "node scripts/bump-kit-version.cjs && bun run build:packages && cd packages/kit && npm publish --access=public",
+    "release:all": "node scripts/bump-changed-versions.cjs && bun run build:packages && node scripts/publish-changed.cjs",
+    "publish:all": "npm run publish:orm && npm run publish:kit",
+    "publish:orm": "cd packages/orm && npm publish --access=public",
+    "publish:kit": "cd packages/kit && npm publish --access=public"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.0.0",
+    "bun-types": "latest",
+    "@types/node": "^20.0.0"
+  }
+}
