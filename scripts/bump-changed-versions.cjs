@@ -49,17 +49,33 @@ function hasPackageChanged(packagePath, sinceTag) {
         }
 
         // Check if there are any changes in the package directory since the tag
-        const changes = execSync(
+        const diff = execSync(
             `git diff --name-only ${sinceTag} HEAD -- ${pkgDir}`,
             { encoding: 'utf8', cwd: path.join(__dirname, '..') }
         ).trim();
 
-        if (changes) {
-            console.log(`  ✓ ${packagePath} has changes since ${sinceTag}:`);
-            changes.split('\n').forEach(file => console.log(`    - ${file}`));
+        if (!diff) {
+            console.log(`  ○ ${packagePath} has no changes since ${sinceTag}`);
+            return false;
+        }
+
+        const files = diff.split('\n');
+
+        // Filter out files that shouldn't trigger a release (Documentation, Tests, etc.)
+        const meaningfulChanges = files.filter(file => {
+            const isMarkdown = file.endsWith('.md');
+            const isTest = file.includes('/tests/') || file.endsWith('.test.ts') || file.endsWith('.spec.ts') || file.endsWith('.check.ts');
+            const isIgnore = file.endsWith('.npmignore') || file.endsWith('.gitignore');
+
+            return !isMarkdown && !isTest && !isIgnore;
+        });
+
+        if (meaningfulChanges.length > 0) {
+            console.log(`  ✓ ${packagePath} has ${meaningfulChanges.length} meaningful changes since ${sinceTag}:`);
+            meaningfulChanges.forEach(file => console.log(`    - ${file}`));
             return true;
         } else {
-            console.log(`  ○ ${packagePath} has no changes since ${sinceTag}`);
+            console.log(`  ○ ${packagePath} only has documentation, test or ignore changes. Skipping bump.`);
             return false;
         }
     } catch (error) {
