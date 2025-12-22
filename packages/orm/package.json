@@ -43,7 +43,7 @@
         "README.md"
     ],
     "scripts": {
-        "build": "bun run build-worker.ts && bun build ./src/index.ts --outdir ./dist --target node --external \"*\" && tsc --project tsconfig.build.json",
+        "build": "bun run build-worker.ts && bun build ./src/index.ts --outdir ./dist --target node --external @clickhouse/client --external uuid --external zod && tsc --project tsconfig.build.json",
         "prepublishOnly": "bun run build",
         "clean": "rm -rf dist"
     },

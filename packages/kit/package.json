@@ -43,7 +43,7 @@
         "README.md"
     ],
     "scripts": {
-        "build": "bun build ./src/index.ts --outdir ./dist --target node --external \"*\" && tsc --project tsconfig.build.json && cp -r dist/packages/kit/src/* dist/ && rm -rf dist/packages",
+        "build": "bun build ./src/index.ts --outdir ./dist --target node --external @housekit/orm --external @clickhouse/client --external chalk --external commander --external inquirer --external ora --external jiti --external random-word-slugs --external cli-table3 && tsc --project tsconfig.build.json && cp -r dist/packages/kit/src/* dist/ && rm -rf dist/packages",
         "clean": "rm -rf dist"
     },
     "dependencies": {
