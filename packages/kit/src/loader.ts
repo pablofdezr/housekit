@@ -111,8 +111,28 @@ export async function getConfigPath(root: string = process.cwd()) {
     return configs[0];
 }
 
+import { validateConfig } from './validation';
+import { error, warn } from './ui';
+
 export async function loadConfig() {
     const configPath = await getConfigPath();
     const module: any = await jiti.import(configPath);
-    return module.default as import('./config').HouseKitConfig;
+    const config = module.default as import('./config').HouseKitConfig;
+
+    const validation = validateConfig(config);
+
+    if (validation.warnings.length > 0) {
+        for (const warning of validation.warnings) {
+            warn(`Config warning [${warning.field}]: ${warning.message}`);
+        }
+    }
+
+    if (!validation.valid) {
+        for (const err of validation.errors) {
+            error(`Config error [${err.field}]: ${err.message}`);
+        }
+        throw new Error('Configuration validation failed');
+    }
+
+    return config;
 }

@@ -20,6 +20,7 @@ import { setGlobalYesMode } from './ui';
 
 // Export types for user config
 export { type HouseKitConfig } from './config';
+export { validateConfig } from './validation';
 
 const program = new Command();
 const require = createRequire(import.meta.url);
