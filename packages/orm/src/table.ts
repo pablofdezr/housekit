@@ -99,17 +99,9 @@ export type TableInsert<TCols extends TableColumns> = {
     ? Auto extends true
     ? never
     : K
-    : never
-    : never]: TCols[K] extends ClickHouseColumn<infer T, any, any> ? T : never
-} & Partial<{
-    [K in keyof TCols as TCols[K] extends ClickHouseColumn<any, infer NotNull, infer Auto>
-    ? NotNull extends true
-    ? Auto extends true
-    ? K
-    : never
     : K
     : never]: TCols[K] extends ClickHouseColumn<infer T, any, any> ? T : never
-}>;
+};
 
 // Helper to extract the TypeScript type from a ClickHouseColumn
 type GetColumnType<T extends ClickHouseColumn> = T extends ClickHouseColumn<infer Type, infer IsNotNull, any>
