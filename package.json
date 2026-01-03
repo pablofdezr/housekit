@@ -17,6 +17,7 @@
     "dev": "turbo run dev",
     "test": "turbo run test",
     "build:packages": "turbo run build --filter=@housekit/orm --filter=@housekit/kit",
+    "release": "node scripts/release.cjs",
     "release:prepare": "node scripts/bump-changed-versions.cjs",
     "release:publish": "node scripts/publish-if-new.cjs",
     "release:orm": "node scripts/bump-orm-version.cjs && bun run build:packages && cd packages/orm && npm publish --access=public",

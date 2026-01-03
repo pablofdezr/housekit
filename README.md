@@ -81,6 +81,44 @@ bun run build
 bun run test
 ```
 
+### Releasing
+
+Use the new release command to publish new versions:
+
+```bash
+# Release all packages with automatic patch bump (default)
+bun run release
+
+# Release specific package with automatic patch bump
+bun run release --orm
+bun run release --kit
+
+# Use next (alias for patch bump)
+bun run release --all --next
+
+# Bump major/minor/patch
+bun run release --all --major
+bun run release --orm --minor
+bun run release --kit --patch
+
+# Set exact version
+bun run release --orm --version=1.2.3
+bun run release --kit --major=1 --minor=2 --patch=3
+```
+
+The release command will:
+1. Check the current version in `package.json`
+2. Compare with the published version on npm
+3. Bump to the new version
+4. Build the packages
+5. Publish to npm
+
+Skip build or publish if needed:
+```bash
+bun run release --all --next --no-build    # Only bump version
+bun run release --all --next --no-publish  # Bump and build, don't publish
+```
+
 ---
 
 ## License
