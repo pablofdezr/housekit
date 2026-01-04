@@ -13,11 +13,13 @@ export {
     type TableOptions,
     type IndexDefinition,
     type ProjectionDefinition,
+    type TableInsert,
     index,
     projection,
     deriveTable,
     renderSchema
 } from './table';
+
 export { Engine, type EngineConfiguration } from './engines';
 export * from './external';
 

@@ -162,6 +162,46 @@ await builder.append(row2);
 
 ---
 
+## 🛠️ Type-Safe Inserts
+
+### Simple Repository Pattern
+
+```typescript
+async insertEvents(events: auditEvents[]) {
+  return await db.insert(auditEvents).values(events);
+}
+
+// Usage
+await repository.insertEvents([
+  { venueId: 'venue-1', ingredientId: 'ing-1', type: 'restock', quantity: 100, at: new Date() },
+  { venueId: 'venue-2', ingredientId: 'ing-2', type: 'sale', quantity: -50, at: new Date(), referenceId: null }
+]);
+```
+
+### How It Works
+
+When you write `table.$inferInsert`, it includes a callable signature. TypeScript interprets `table[]` as invoking that callable and applying the array type, giving you `TableInsert<T>[]` automatically.
+
+### Alternative Approaches
+
+```typescript
+import { TableInsertArray } from '@housekit/orm';
+
+// Using explicit type helper
+async insertEvents(events: TableInsertArray<typeof salesEvents>) {
+  return await db.insert(salesEvents).values(events);
+}
+
+// Using $inferInsert directly
+async insertEvents(events: typeof salesEvents.$inferInsert[]) {
+  return await db.insert(salesEvents).values(events);
+}
+```
+
+**Recommended**: Use `table[]` for the cleanest, most ergonomic DX.
+
+---
+
 ## 🤝 Smart Relational API
 
 Traditional ORMs produce "Flat Joins" that duplicate data (the Cartesian Product problem). HouseKit's Relational API uses ClickHouse's `groupArray` internally to fetch related data as nested arrays in a single, efficient query.
