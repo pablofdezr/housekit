@@ -116,6 +116,8 @@ export type InferInsertModel<T extends { $columns: TableColumns }> = TableInsert
     (): TableInsert<T['$columns']>;
 };
 
+export type TableInsertArray<T extends TableDefinition<TableColumns>> = T['$inferInsert'][];
+
 export type TableDefinition<TCols extends TableColumns, TOptions = TableOptions> = {
     $table: string;
     $columns: TCols;
