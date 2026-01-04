@@ -1,8 +1,8 @@
 import type { ClickHouseClient } from '@clickhouse/client';
 import type { SQLExpression } from '../expressions';
-import type { TableDefinition, TableColumns } from '../core';
+import type { TableRuntime } from '../core';
 
-export class ClickHouseDeleteBuilder<TTable extends TableDefinition<TableColumns>> {
+export class ClickHouseDeleteBuilder<TTable extends TableRuntime<any, any>> {
     private _where: SQLExpression | null = null;
     private _lastMutationId: string | null = null;
 

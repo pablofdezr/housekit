@@ -7,11 +7,11 @@ import { ClickHouseQueryBuilder } from './builders/select';
 import { ClickHouseInsertBuilder } from './builders/insert';
 import { ClickHouseDeleteBuilder } from './builders/delete';
 import { ClickHouseUpdateBuilder } from './builders/update';
-import { type TableDefinition, type TableColumns, type TableInsert } from './core';
+import { type TableDefinition, type TableRuntime, type CleanInsert } from './core';
 import type { SQLExpression } from './expressions';
 import { buildInsertPlan, processRowsStream } from './utils/insert-processing';
 import { wrapClientWithLogger, type HousekitLogger } from './logger';
-import { buildRelationalAPI, type RelationalFindOptions } from './relational';
+import { buildRelationalAPI, type RelationalAPI } from './relational';
 
 export type HousekitClientConfig = ClickHouseClientConfigOptions & { schema?: Record<string, TableDefinition<any>>; logger?: HousekitLogger };
 export type ClientConfigWithSchema = HousekitClientConfig;
@@ -20,14 +20,14 @@ export interface HousekitClient<TSchema extends Record<string, TableDefinition<a
     rawClient: ClickHouseClient; 
     select: <T extends Record<string, any> | TableDefinition<any>>(fieldsOrTable?: T) => any;
     with: (name: string, query: ClickHouseQueryBuilder<any>) => ClickHouseQueryBuilder<any>;
-    insert: <TCols extends TableColumns>(table: TableDefinition<TCols>) => ClickHouseInsertBuilder<any>;
-    insertMany: <TCols extends TableColumns>(
-        table: TableDefinition<TCols>,
-        values: Array<TableInsert<TCols>> | Iterable<TableInsert<TCols>> | AsyncIterable<TableInsert<TCols>>,
+    insert: <TTable extends TableRuntime<any, any>>(table: TTable) => ClickHouseInsertBuilder<TTable>;
+    insertMany: <TTable extends TableRuntime<any, any>>(
+        table: TTable,
+        values: Array<CleanInsert<TTable>> | Iterable<CleanInsert<TTable>> | AsyncIterable<CleanInsert<TTable>>,
         opts?: { maxBlockSize?: number; asyncInsertWait?: boolean }
     ) => Promise<void>;
-    update: <TCols extends TableColumns>(table: TableDefinition<TCols>) => ClickHouseUpdateBuilder<any>;
-    delete: <TCols extends TableColumns>(table: TableDefinition<TCols>) => ClickHouseDeleteBuilder<any>;
+    update: <TTable extends TableRuntime<any, any>>(table: TTable) => ClickHouseUpdateBuilder<TTable>;
+    delete: <TTable extends TableRuntime<any, any>>(table: TTable) => ClickHouseDeleteBuilder<TTable>;
     command: (params: { query: string; query_params?: Record<string, unknown>; format?: string }) => Promise<any>;
     raw: (query: string, params?: Record<string, unknown>) => Promise<any>;
     tableExists: (tableName: string) => Promise<boolean>;
@@ -37,12 +37,7 @@ export interface HousekitClient<TSchema extends Record<string, TableDefinition<a
     schema: TSchema;
     _config: HousekitClientConfig;
     query: TSchema extends Record<string, TableDefinition<any>>
-    ? {
-        [K in keyof TSchema]: {
-            findMany: (opts?: RelationalFindOptions) => Promise<any[]>;
-            findFirst: (opts?: RelationalFindOptions) => Promise<any | null>;
-        }
-    }
+    ? RelationalAPI<TSchema>
     : undefined;
 }
 
@@ -105,23 +100,23 @@ export function createHousekitClient<TSchema extends Record<string, TableDefinit
 
     const baseClient: HousekitClient<TSchema> = {
         rawClient: client as ClickHouseClient,
-        select: <T extends Record<string, any> | TableDefinition<any>>(fieldsOrTable?: T) => {
+        select: <T extends Record<string, any> | TableDefinition<any> | undefined = undefined>(fieldsOrTable?: T) => {
             const builder: any = new ClickHouseQueryBuilder(client);
             if (!fieldsOrTable) return builder.select();
-            if (typeof fieldsOrTable === 'object' && fieldsOrTable !== null && '$table' in fieldsOrTable && '$columns' in fieldsOrTable) {
-                return builder.select().from(fieldsOrTable);
+            if (typeof fieldsOrTable === 'object' && fieldsOrTable !== null && '$table' in fieldsOrTable) {
+                return builder.select().from(fieldsOrTable as TableDefinition<any>);
             }
-            return builder.select(fieldsOrTable);
+            return builder.select(fieldsOrTable as any);
         },
         with: (name: string, query: ClickHouseQueryBuilder<any>) => {
             const builder = new ClickHouseQueryBuilder(client);
             return builder.with(name, query);
         },
-        insert: <TCols extends TableColumns>(table: TableDefinition<TCols>) =>
-            new ClickHouseInsertBuilder<any>(client, table),
-        insertMany: async <TCols extends TableColumns>(
-            table: TableDefinition<TCols>,
-            values: Array<TableInsert<TCols>> | Iterable<TableInsert<TCols>> | AsyncIterable<TableInsert<TCols>>,
+        insert: <TTable extends TableRuntime<any, any>>(table: TTable) =>
+            new ClickHouseInsertBuilder(client, table),
+        insertMany: async <TTable extends TableRuntime<any, any>>(
+            table: TTable,
+            values: Array<CleanInsert<TTable>> | Iterable<CleanInsert<TTable>> | AsyncIterable<CleanInsert<TTable>>,
             opts?: { maxBlockSize?: number; asyncInsertWait?: boolean }
         ) => {
             const blockSize = Math.max(opts?.maxBlockSize || 10000, 1);
@@ -140,10 +135,10 @@ export function createHousekitClient<TSchema extends Record<string, TableDefinit
                 ...(clickhouse_settings ? { clickhouse_settings } : {})
             });
         },
-        update: <TCols extends TableColumns>(table: TableDefinition<TCols>) =>
-            new ClickHouseUpdateBuilder<any>(client, table),
-        delete: <TCols extends TableColumns>(table: TableDefinition<TCols>) =>
-            new ClickHouseDeleteBuilder<any>(client, table),
+        update: <TTable extends TableRuntime<any, any>>(table: TTable) =>
+            new ClickHouseUpdateBuilder(client, table),
+        delete: <TTable extends TableRuntime<any, any>>(table: TTable) =>
+            new ClickHouseDeleteBuilder(client, table),
         command: async (params: { query: string; query_params?: Record<string, unknown>; format?: string }) => {
             return client.query(params as any);
         },

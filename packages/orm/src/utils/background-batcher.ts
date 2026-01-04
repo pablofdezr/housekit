@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from '@clickhouse/client';
-import type { TableDefinition } from '../core';
+import type { TableRuntime } from '../core';
 import { SyncBinarySerializer } from './binary-worker-pool';
 
 export interface BatchConfig {
@@ -12,14 +12,14 @@ class BackgroundBatcher {
     private queues = new Map<string, any[]>();
     // Map: "tableName" -> flush timer
     private timers = new Map<string, NodeJS.Timeout>();
-    // Map: "tableName" -> TableDefinition (captured for context)
-    private tables = new Map<string, TableDefinition<any>>();
+    // Map: "tableName" -> TableRuntime (captured for context)
+    private tables = new Map<string, TableRuntime<any, any>>();
     // Cache of serializers per table to avoid re-creation
     private serializers = new Map<string, SyncBinarySerializer>();
 
     constructor(private client: ClickHouseClient) { }
 
-    private getSerializer(table: TableDefinition<any>): SyncBinarySerializer {
+    private getSerializer(table: TableRuntime<any, any>): SyncBinarySerializer {
         const tableName = table.$table;
         if (!this.serializers.has(tableName)) {
             // Convert table schema to serializer config
@@ -33,7 +33,7 @@ class BackgroundBatcher {
         return this.serializers.get(tableName)!;
     }
 
-    async add(table: TableDefinition<any>, row: any, config: BatchConfig) {
+    async add(table: TableRuntime<any, any>, row: any, config: BatchConfig) {
         const tableName = table.$table;
 
         if (!this.queues.has(tableName)) {

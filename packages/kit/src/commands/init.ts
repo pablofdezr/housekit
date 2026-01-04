@@ -116,8 +116,10 @@ export default {
 
         // Create example schema file
         const exampleSchemaPath = join(schemaPath, `logs.${fileType}`);
+        const importLine = `import { t, defineTable, Engine } from '@housekit/orm';`;
+        const typeAliasLine = '\n';
         const exampleSchemaContent = `// Example table - This is a sample schema file to demonstrate HouseKit usage
-import { t, defineTable, Engine } from '@housekit/orm';
+${importLine}
 
 export const logs = defineTable('logs', {
     id: t.uuid('id').autoGenerate().primaryKey(),
@@ -131,7 +133,7 @@ export const logs = defineTable('logs', {
     orderBy: ['createdAt', 'id'],
     appendOnly: false
 });
-`;
+${typeAliasLine}`;
 
         writeFileSync(exampleSchemaPath, exampleSchemaContent);
         info(`Created example schema: ${quoteName(exampleSchemaPath)}`);

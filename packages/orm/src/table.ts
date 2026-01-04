@@ -67,18 +67,18 @@ export const projection = (name: string, query: string): ProjectionDefinition =>
     query
 });
 
-export type RelationDefinition =
+export type RelationDefinition<TTarget extends TableDefinition<any> = TableDefinition<any>> =
     | {
         relation: 'one';
         name: string;
-        table: TableDefinition<any>;
+        table: TTarget;
         fields: ClickHouseColumn[];
         references: ClickHouseColumn[];
     }
     | {
         relation: 'many';
         name: string;
-        table: TableDefinition<any>;
+        table: TTarget;
         fields?: ClickHouseColumn[];
         references?: ClickHouseColumn[];
     };
@@ -110,17 +110,16 @@ type GetColumnType<T extends ClickHouseColumn> = T extends ClickHouseColumn<infe
 
 export type InferSelectModel<T extends { $columns: TableColumns }> = { [K in keyof T['$columns']]: GetColumnType<T['$columns'][K]> };
 
-export type InferInsertModel<T extends { $columns: TableColumns }> = TableInsert<T['$columns']> & {
-    (): TableInsert<T['$columns']>;
-    (): TableInsert<T['$columns']>[];
-    (): TableInsert<T['$columns']>;
-};
+export type InferInsertModel<T extends { $columns: TableColumns }> = TableInsert<T['$columns']>;
+
+type InferInsertFromColumns<T> = T extends { $columns: infer TCols extends TableColumns } ? TableInsert<TCols> : never;
+type InferSelectFromColumns<T> = T extends { $columns: infer TCols extends TableColumns } ? InferSelectModel<{ $columns: TCols }> : never;
 
 // @internal - Used internally for clean autocomplete
-export type CleanInsert<T extends { $inferInsert?: any }> = T extends { $inferInsert?: infer I } ? I : never;
+export type CleanInsert<T> = T extends { $inferInsert: infer I } ? I : InferInsertFromColumns<T>;
 
 // @internal - Used internally for clean autocomplete
-export type CleanSelect<T extends { $inferSelect?: any }> = T extends { $inferSelect?: infer S } ? S : never;
+export type CleanSelect<T> = T extends { $inferSelect: infer S } ? S : InferSelectFromColumns<T>;
 
 export type InferInsertValue<TCols extends TableColumns, K extends keyof TCols> =
   TCols[K] extends ClickHouseColumn<infer Type, infer NotNull, any>
@@ -150,9 +149,23 @@ export type TableDefinition<TCols extends TableColumns, TOptions = TableOptions>
     toSQLs?(): string[];
     as(alias: string): TableDefinition<TCols, TOptions>;
     // Phantom types for inference
-    $inferSelect?: InferSelectModel<{ $columns: TCols }>;
-    $inferInsert?: InferInsertModel<{ $columns: TCols }>;
+    $inferSelect: InferSelectModel<{ $columns: TCols }>;
+    $inferInsert: InferInsertModel<{ $columns: TCols }>;
 } & TCols;
+
+// Internal table shape for cleaner public signatures.
+export type TableRuntime<TInsert = any, TSelect = any, TOptions = TableOptions> = {
+    $table: string;
+    $columns: TableColumns;
+    $options: TOptions;
+    $relations?: Record<string, RelationDefinition>;
+    toSQL(): string;
+    toSQLs?(): string[];
+    as(alias: string): TableRuntime<TInsert, TSelect, TOptions>;
+    // Phantom types for inference
+    $inferSelect: TSelect;
+    $inferInsert: TInsert;
+};
 
 export interface VersionedMeta {
     baseName: string;

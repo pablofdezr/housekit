@@ -1,6 +1,6 @@
 import type { ClickHouseClient } from '@clickhouse/client';
-import { ClickHouseColumn, type TableDefinition, type TableInsert, type TableColumns, type CleanInsert } from '../core';
-import { buildInsertPlan, processRowsStream, type InsertPlan } from '../utils/insert-processing';
+import { type TableRuntime, type CleanInsert, type CleanSelect } from '../core';
+import { buildInsertPlan, processRowWithPlan, processRowsStream, type InsertPlan } from '../utils/insert-processing';
 import { createBatchTransformStream, type BatchTransformOptions } from '../utils/batch-transform';
 import { SyncBinarySerializer } from '../utils/binary-worker-pool';
 import {
@@ -11,7 +11,7 @@ import {
 } from '../utils/binary-serializer';
 import { Readable, Transform } from 'stream';
 import { type BatchConfig, globalBatcher } from '../utils/background-batcher';
-import { v4 as uuidv4, v7 as uuidv7 } from 'uuid';
+import { v1 as uuidv1, v4 as uuidv4, v6 as uuidv6, v7 as uuidv7 } from 'uuid';
 
 // ============================================================================
 // Types
@@ -92,8 +92,8 @@ class BinaryTransform extends Transform {
 // Insert Builder
 // ============================================================================
 
-export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns>> {
-    private _values: Array<TableInsert<TTable['$columns']>> | Iterable<TableInsert<TTable['$columns']>> | AsyncIterable<TableInsert<TTable['$columns']>> | Readable | null = null;
+export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TReturn = void> {
+    private _values: Array<CleanInsert<TTable>> | Iterable<CleanInsert<TTable>> | AsyncIterable<CleanInsert<TTable>> | Readable | null = null;
     private _async: boolean = true;  // DEFAULT: async_insert enabled for best performance
     private _waitForAsync: boolean = true;
     private _batchOptions: BatchTransformOptions = {};
@@ -101,6 +101,7 @@ export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns
     private _batchSize: number = 1000;
     private _batchConfig: BatchConfig | null = null;
     private _forceJson: boolean = false;
+    private _returning: boolean = false;
 
     constructor(
         private client: ClickHouseClient,
@@ -125,6 +126,11 @@ export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns
     /** @template [T = CleanInsert<TTable>] */
     async insert(data: CleanInsert<TTable> | CleanInsert<TTable>[]) {
         return this.values(data as any);
+    }
+
+    returning(): ClickHouseInsertBuilder<TTable, CleanSelect<TTable>[]> {
+        this._returning = true;
+        return this as any;
     }
 
     /** 
@@ -259,7 +265,7 @@ export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns
         return this.useBinaryFormat();
     }
 
-    async execute() {
+    async execute(): Promise<TReturn> {
         if (!this._values) {
             throw new Error("❌ No values to insert");
         }
@@ -268,6 +274,27 @@ export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns
         }
 
         const plan = buildInsertPlan(this.table);
+
+        if (this._returning) {
+            if (this._batchConfig) {
+                throw new Error('❌ returning() cannot be used with background batching');
+            }
+
+            const { processedRows, resultRows } = await this.collectReturningRows(plan);
+            const stream = Readable.from(processedRows, { objectMode: true });
+
+            await this.client.insert({
+                table: this.table.$table,
+                values: stream,
+                format: 'JSONEachRow',
+                clickhouse_settings: {
+                    async_insert: this._async ? 1 : 0,
+                    wait_for_async_insert: this._waitForAsync ? 1 : 0,
+                },
+            });
+
+            return resultRows as any;
+        }
 
         // --- Background Batching Path ---
         if (this._batchConfig && !this._forceJson) {
@@ -280,7 +307,7 @@ export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns
                 // Fire-and-forget to ensure zero-latency API response
                 batcher.add(this.table, row, this._batchConfig);
             }
-            return; // Return immediately, background flush handles it
+            return undefined as any; // Return immediately, background flush handles it
         }
 
         // --- Immediate Execution Path ---
@@ -294,6 +321,8 @@ export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns
         } else {
             await this.executeJsonInsert(plan, tableName, format);
         }
+
+        return undefined as any;
     }
 
     /**
@@ -458,17 +487,84 @@ export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns
         }
     }
 
+    private async collectReturningRows(
+        plan: InsertPlan
+    ): Promise<{ processedRows: Array<Record<string, any>>; resultRows: Array<CleanSelect<TTable>> }> {
+        const processedRows: Array<Record<string, any>> = [];
+        const resultRows: Array<CleanSelect<TTable>> = [];
+        const values = this._values as any;
+        const iterable = values instanceof Readable ? values :
+            Array.isArray(values) ? values :
+                isIterable(values) ? values :
+                    isAsyncIterable(values) ? values :
+                        [values];
+
+        for await (const row of iterable as any) {
+            const processed = processRowWithPlan(row as any, plan, 'json') as Record<string, any>;
+
+            for (const col of plan.columns) {
+                if (processed[col.columnName] !== undefined) continue;
+                const expr = col.column.meta?.defaultExpr;
+                if (!expr) continue;
+                const resolved = this.resolveClientDefaultExpr(expr);
+                if (resolved !== undefined) {
+                    processed[col.columnName] = col.transform(resolved);
+                }
+            }
+
+            this.assertReturningRow(row as any, processed, plan);
+            processedRows.push(processed);
+
+            const resultRow: Record<string, any> = {};
+            for (const col of plan.columns) {
+                const value = processed[col.columnName];
+                resultRow[col.propKey] = value;
+            }
+            resultRows.push(resultRow as CleanSelect<TTable>);
+        }
+
+        return { processedRows, resultRows };
+    }
+
+    private assertReturningRow(rawRow: Record<string, any>, processed: Record<string, any>, plan: InsertPlan) {
+        for (const col of plan.columns) {
+            const hasValue = rawRow[col.propKey] !== undefined || rawRow[col.columnName] !== undefined;
+            if (hasValue) continue;
+            if (processed[col.columnName] !== undefined) {
+                continue;
+            }
+            if (col.defaultFn || (col.autoUUIDVersion !== null && !col.useServerUUID) || col.hasDefault) {
+                continue;
+            }
+            if (col.useServerUUID || col.column.meta?.defaultExpr) {
+                throw new Error(`❌ returning() cannot infer column '${col.columnName}' because it uses a server-side default. Provide a value or remove the default expression.`);
+            }
+        }
+    }
+
+    private resolveClientDefaultExpr(expr: string) {
+        const normalized = expr.replace(/\s+/g, '').toLowerCase();
+        if (normalized === 'now()' || normalized === 'now64()' || normalized.startsWith('now64(')) {
+            return new Date();
+        }
+        if (normalized === 'generateuuidv4()') return uuidv4();
+        if (normalized === 'generateuuidv7()') return uuidv7();
+        if (normalized === 'generateuuidv1()') return uuidv1();
+        if (normalized === 'generateuuidv6()') return uuidv6();
+        return undefined;
+    }
+
     // Thenable implementation
-    async then<TResult1 = void, TResult2 = never>(
-        onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null,
+    async then<TResult1 = TReturn, TResult2 = never>(
+        onfulfilled?: ((value: TReturn) => TResult1 | PromiseLike<TResult1>) | null,
         onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
     ): Promise<TResult1 | TResult2> {
         try {
-            await this.execute();
+            const result = await this.execute();
             if (onfulfilled) {
-                return Promise.resolve(onfulfilled());
+                return Promise.resolve(onfulfilled(result));
             }
-            return Promise.resolve() as any;
+            return Promise.resolve(result) as any;
         } catch (error) {
             if (onrejected) {
                 return Promise.resolve(onrejected(error));
@@ -485,4 +581,3 @@ function isIterable(obj: any): obj is Iterable<any> {
 function isAsyncIterable(obj: any): obj is AsyncIterable<any> {
     return obj && typeof obj[Symbol.asyncIterator] === 'function';
 }
-

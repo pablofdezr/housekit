@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from '@clickhouse/client';
-import { ClickHouseColumn, type TableDefinition, type TableOptions } from '../core';
-import { sql, type SQLExpression } from '../expressions';
+import { ClickHouseColumn, type TableDefinition, type TableOptions, type InferSelectModel } from '../core';
+import { sql, type SQLExpression, eq } from '../expressions';
+import { and } from '../modules/conditional';
 import { QueryCompiler } from '../compiler';
 import { BinaryReader, createBinaryDecoder, type BinaryDecoder } from '../utils/binary-reader';
 import {
@@ -62,6 +63,7 @@ export class ClickHouseQueryBuilder<
     TResult = InferQueryResult<TTable, TSelection>
 > {
     private _select: SelectionShape | null = null;
+    private _selectResolver: ((cols: any) => SelectionShape) | null = null;
     private _table: TableDefinition<any> | SubqueryTable | null = null;
     private _prewhere: SQLExpression | null = null;
     private _sample: { ratio: number; offset?: number } | null = null;
@@ -83,11 +85,26 @@ export class ClickHouseQueryBuilder<
     constructor(private client: ClickHouseClient) { }
 
     // 1. SELECT
-    select<TNewSelection extends SelectionShape>(fields: TNewSelection): ClickHouseQueryBuilder<TTable, TNewSelection, InferQueryResult<TTable, TNewSelection>>;
+    select<TNewSelection extends SelectionShape>(
+        fields: TNewSelection
+    ): ClickHouseQueryBuilder<TTable, TNewSelection, InferQueryResult<TTable, TNewSelection>>;
+    select<TNewSelection extends SelectionShape>(
+        fields: (cols: TTable extends TableDefinition<infer TCols> ? TCols : any) => TNewSelection
+    ): ClickHouseQueryBuilder<TTable, TNewSelection, InferQueryResult<TTable, TNewSelection>>;
     select(): ClickHouseQueryBuilder<TTable, null, InferQueryResult<TTable, null>>;
-    select<TNewSelection extends SelectionShape>(fields?: TNewSelection) {
+    select<TNewSelection extends SelectionShape>(fields?: TNewSelection | ((cols: any) => TNewSelection)) {
         if (fields) {
+            if (typeof fields === 'function') {
+                if (!this._table) {
+                    this._selectResolver = fields as any;
+                    return this as any;
+                }
+                this._select = (fields as any)(this._table.$columns) as any;
+                this._selectResolver = null;
+                return this as any;
+            }
             this._select = fields as any;
+            this._selectResolver = null;
             return this as any;
         }
         return this as any;
@@ -108,19 +125,55 @@ export class ClickHouseQueryBuilder<
         if (defaultFinal !== undefined) {
             this._final = Boolean(defaultFinal);
         }
+        this.resolveSelect();
         return this as any; // Cast to resolve deep type instantiation error for this path
     }
 
     private fromSubquery<TSubQuery extends ClickHouseQueryBuilder<any, any, any>>(subquery: TSubQuery, alias: string) {
         this._table = this.createSubqueryTable(alias, subquery);
         this._final = false; // FINAL does not apply to derived tables
+        this.resolveSelect();
         return this as any; // Cast to resolve deep type instantiation error
     }
 
+    private resolveSelect() {
+        if (!this._selectResolver) return;
+        if (!this._table) {
+            throw new Error('Call .from() before using callback select');
+        }
+        this._select = this._selectResolver(this._table.$columns as any);
+        this._selectResolver = null;
+    }
+
     // 3. WHERE
-    where(expression: SQLExpression | undefined | null) {
-        if (expression) {
-            this._where = expression;
+    where(
+        expression: SQLExpression | (TTable extends TableDefinition<infer TCols> ? Partial<InferSelectModel<{ $columns: TCols }>> : Record<string, any>) | undefined | null
+    ) {
+        if (!expression) return this;
+
+        if (typeof expression === 'object' && 'toSQL' in expression) {
+            this._where = expression as SQLExpression;
+            return this;
+        }
+
+        if (typeof expression === 'object') {
+            const table: any = this._table;
+            if (!table) return this;
+
+            const chunks: SQLExpression[] = [];
+            const columns = table.$columns || table;
+
+            for (const [key, value] of Object.entries(expression as Record<string, any>)) {
+                const column = table[key] || columns?.[key];
+                if (column) {
+                    chunks.push(eq(column, value));
+                }
+            }
+
+            if (chunks.length > 0) {
+                const combined = chunks.length === 1 ? chunks[0] : and(...chunks);
+                if (combined) this._where = combined;
+            }
         }
         return this;
     }
@@ -541,6 +594,7 @@ export class ClickHouseQueryBuilder<
     }
 
     getState(): QueryBuilderState<ClickHouseQueryBuilder<any>> {
+        this.resolveSelect();
         return {
             select: this._select,
             table: this._table,

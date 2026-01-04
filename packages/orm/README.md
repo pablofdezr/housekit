@@ -167,7 +167,9 @@ await builder.append(row2);
 ### Simple Repository Pattern
 
 ```typescript
-async insertEvents(events: auditEvents[]) {
+import type { InferInsert } from '@housekit/orm';
+
+async insertEvents(events: InferInsert<typeof auditEvents>[]) {
   return await db.insert(auditEvents).values(events);
 }
 
@@ -181,16 +183,27 @@ await repository.insertEvents([
 ### Type Helpers
 
 ```typescript
-import { TableInsertArray } from '@housekit/orm';
+import type { TableInsertArray, InferInsert } from '@housekit/orm';
+
+// Using the direct helper
+async insertEvents(events: InferInsert<typeof salesEvents>[]) {
+  return await db.insert(salesEvents).values(events);
+}
 
 // Using explicit type helper
 async insertEvents(events: TableInsertArray<typeof salesEvents>) {
   return await db.insert(salesEvents).values(events);
 }
+```
 
-// Using $inferInsert directly
-async insertEvents(events: typeof salesEvents.$inferInsert[]) {
-  return await db.insert(salesEvents).values(events);
+### Inline Types (No Extra Exports)
+
+```typescript
+import { users } from './schema';
+import type { Infer } from '@housekit/orm';
+
+function UserCard({ user }: { user: Infer<typeof users> }) {
+  return <div>{user.email}</div>;
 }
 ```
 

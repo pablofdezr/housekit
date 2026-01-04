@@ -2,7 +2,8 @@ import type { ClickHouseClientConfigOptions } from '@clickhouse/client';
 import { resolve, join } from 'path';
 import { existsSync, readdirSync } from 'fs';
 import { type TableDefinition, type TableColumns } from './core';
-import { createClientFromConfigObject, type ClientConfigWithSchema } from './client';
+import { createClientFromConfigObject, createHousekitClient, type ClientConfigWithSchema, type HousekitClient as HousekitClientType } from './client';
+import { generateSelectSchema, generateInsertSchema } from './codegen/zod';
 
 // Export core types and utilities explicitly
 export { ClickHouseColumn } from './column';
@@ -13,12 +14,26 @@ export {
     type TableOptions,
     type IndexDefinition,
     type ProjectionDefinition,
+    type InsertModel,
+    type TableModel,
+    type TableInsertArray,
+    type TableRuntime,
     type TableInsert,
     index,
     projection,
     deriveTable,
     renderSchema
 } from './table';
+
+/**
+ * Infer the SELECT type (result) from a table definition.
+ */
+export type Infer<T> = T extends { $inferSelect: infer U } ? U : never;
+
+/**
+ * Infer the INSERT type (input) from a table definition.
+ */
+export type InferInsert<T> = T extends { $inferInsert: infer U } ? U : never;
 
 export { Engine, type EngineConfiguration } from './engines';
 export * from './external';
@@ -95,6 +110,23 @@ export async function createClientFromConfig(databaseName: string = 'default'): 
     };
 
     return createClientFromConfigObject(clientConfig);
+}
+
+export function housekit<TSchema extends Record<string, TableDefinition<any>> = Record<string, TableDefinition<any>>>(
+    config: ClickHouseClientConfigOptions,
+    options?: { schema?: TSchema }
+): HousekitClientType<TSchema> {
+    return createHousekitClient({
+        ...config,
+        schema: options?.schema
+    });
+}
+
+export function createSchema<TCols extends TableColumns>(table: TableDefinition<TCols>) {
+    return {
+        select: generateSelectSchema(table),
+        insert: generateInsertSchema(table),
+    };
 }
 
 /**
@@ -240,7 +272,6 @@ import {
 import { sql } from './expressions';
 import { Engine } from './engines';
 import { index, projection, deriveTable } from './table';
-import { generateSelectSchema, generateInsertSchema } from './codegen/zod';
 
 /**
  * Optional default export for users who prefer this style.

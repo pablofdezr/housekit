@@ -1,8 +1,8 @@
 import type { ClickHouseClient } from '@clickhouse/client';
 import type { SQLExpression } from '../expressions';
-import { ClickHouseColumn, type TableDefinition, type TableColumns } from '../core';
+import { ClickHouseColumn, type TableRuntime } from '../core';
 
-export class ClickHouseUpdateBuilder<TTable extends TableDefinition<TableColumns>> {
+export class ClickHouseUpdateBuilder<TTable extends TableRuntime<any, any>> {
     private _set: Record<string, any> = {};
     private _where: SQLExpression | null = null;
     private _lastMutationId: string | null = null;

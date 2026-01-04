@@ -267,10 +267,12 @@ function buildTableFile(
     const optionsBlock = optionLines.length > 0 ? `, {\n${optionLines.join(',\n')}\n}` : '';
 
     const exportStatement = `export const ${variableName} = defineTable('${table}', (t) => ({\n${columnLines}\n})${optionsBlock});`;
+    const importLine = `import { t, defineTable, Engine } from '@housekit/orm';`;
+    const typeAlias = '\n';
 
-    return `${comment}import { t, defineTable, Engine } from '@housekit/orm';
+    return `${comment}${importLine}
 
-${exportStatement}
+${exportStatement}${typeAlias}
 `;
 }
 

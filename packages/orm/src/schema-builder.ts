@@ -224,6 +224,37 @@ export const t = {
     // --- Enum Type ---
     enum: (name: string, values: readonly string[]) =>
         new ClickHouseColumn<string, false>(name, 'String', true, { enumValues: values }),
+
+    // --- Presets ---
+
+    /**
+     * Adds 'created_at' and 'updated_at' columns with default now().
+     */
+    timestamps: () => ({
+        created_at: new ClickHouseColumn<Date | string>('created_at', 'DateTime').default('now()'),
+        updated_at: new ClickHouseColumn<Date | string>('updated_at', 'DateTime').default('now()'),
+    }),
+
+    /**
+     * Adds a standard UUID primary key column (default: 'id').
+     */
+    primaryUuid: <TName extends string = 'id'>(name?: TName) => {
+        const colName = (name ?? 'id') as TName;
+        return {
+            [colName]: new ClickHouseColumn<string>(colName, 'UUID')
+                .autoGenerate()
+                .primaryKey()
+                .default('generateUUIDv4()')
+        } as { [K in TName]: ClickHouseColumn<string> };
+    },
+
+    /**
+     * Adds 'is_deleted' and 'deleted_at' columns for soft deletes.
+     */
+    softDeletes: () => ({
+        is_deleted: new ClickHouseColumn<boolean>('is_deleted', 'Bool').default(false),
+        deleted_at: new ClickHouseColumn<Date | string>('deleted_at', 'DateTime').nullable(),
+    }),
 };
 
 // Type for the builder object
@@ -276,19 +307,54 @@ export { chProjection as defineProjection };
 /**
  * Define relations for a table using a callback pattern.
  */
-export function relations<TTable extends TableDefinition<any>>(
+export function relations<
+    TTable extends TableDefinition<any>,
+    TRelations extends Record<string, RelationDefinition<any>>
+>(
     table: TTable,
     relationsBuilder: (helpers: {
-        one: (
-            table: TableDefinition<any>,
+        one: <TTarget extends TableDefinition<any>>(
+            table: TTarget,
             config: { fields: ClickHouseColumn<any, any, any>[]; references: ClickHouseColumn<any, any, any>[] }
-        ) => RelationDefinition;
-        many: (
-            table: TableDefinition<any>,
+        ) => RelationDefinition<TTarget>;
+        many: <TTarget extends TableDefinition<any>>(
+            table: TTarget,
             config?: { fields?: ClickHouseColumn<any, any, any>[]; references?: ClickHouseColumn<any, any, any>[] }
-        ) => RelationDefinition;
-    }) => Record<string, RelationDefinition>
-): Record<string, RelationDefinition> {
+        ) => RelationDefinition<TTarget>;
+    }) => TRelations
+): asserts table is TTable & { $relations: TRelations };
+export function relations<
+    TTable extends TableDefinition<any>,
+    TRelations extends Record<string, RelationDefinition<any>>
+>(
+    table: TTable,
+    relationsBuilder: (helpers: {
+        one: <TTarget extends TableDefinition<any>>(
+            table: TTarget,
+            config: { fields: ClickHouseColumn<any, any, any>[]; references: ClickHouseColumn<any, any, any>[] }
+        ) => RelationDefinition<TTarget>;
+        many: <TTarget extends TableDefinition<any>>(
+            table: TTarget,
+            config?: { fields?: ClickHouseColumn<any, any, any>[]; references?: ClickHouseColumn<any, any, any>[] }
+        ) => RelationDefinition<TTarget>;
+    }) => TRelations
+): TRelations;
+export function relations<
+    TTable extends TableDefinition<any>,
+    TRelations extends Record<string, RelationDefinition<any>>
+>(
+    table: TTable,
+    relationsBuilder: (helpers: {
+        one: <TTarget extends TableDefinition<any>>(
+            table: TTarget,
+            config: { fields: ClickHouseColumn<any, any, any>[]; references: ClickHouseColumn<any, any, any>[] }
+        ) => RelationDefinition<TTarget>;
+        many: <TTarget extends TableDefinition<any>>(
+            table: TTarget,
+            config?: { fields?: ClickHouseColumn<any, any, any>[]; references?: ClickHouseColumn<any, any, any>[] }
+        ) => RelationDefinition<TTarget>;
+    }) => TRelations
+): TRelations {
     const helpers = {
         one: (targetTable: TableDefinition<any>, config: { fields: ClickHouseColumn[]; references: ClickHouseColumn[] }): RelationDefinition => ({
             relation: 'one',

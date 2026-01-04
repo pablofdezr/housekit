@@ -1,4 +1,4 @@
-import { ClickHouseColumn, type TableDefinition } from '../core';
+import { ClickHouseColumn, type TableRuntime } from '../core';
 import { v1, v3, v4, v5, v6, v7 } from 'uuid';
 
 type UUIDVersion = 1 | 3 | 4 | 5 | 6 | 7;
@@ -22,7 +22,7 @@ export type InsertPlan = {
     useCompact: boolean;
 };
 
-export function buildInsertPlan(table: TableDefinition<any>): InsertPlan {
+export function buildInsertPlan(table: TableRuntime<any, any>): InsertPlan {
     const columns: PreparedInsertColumn[] = [];
     const keyToColumn = new Map<string, PreparedInsertColumn>();
 

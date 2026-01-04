@@ -43,6 +43,6 @@ reproduce_phase3.ts
 # are intentionally NOT ignored so they stay public.
 
 # Other files
-cat.js
 CLAUDE.md
 .gemini
+cat.js

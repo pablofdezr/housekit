@@ -2,7 +2,7 @@ import { ClickHouseQueryBuilder } from './builders/select';
 import { SQL } from './expressions';
 import * as ops from './expressions';
 import * as cond from './modules/conditional';
-import { ClickHouseColumn, type RelationDefinition, type TableDefinition } from './core';
+import { ClickHouseColumn, type RelationDefinition, type TableDefinition, type CleanSelect } from './core';
 import type { SQLExpression } from './expressions';
 
 /**
@@ -33,6 +33,16 @@ const operators = {
 
 type Operators = typeof operators;
 
+type Simplify<T> = { [K in keyof T]: T[K] } & {};
+
+type RelationsOf<TTable> = TTable extends { $relations: infer R } ? R : {};
+
+type NormalizedRelations<TTable> = RelationsOf<TTable> extends Record<string, RelationDefinition<any>>
+    ? RelationsOf<TTable>
+    : {};
+
+type RelationTarget<T> = T extends RelationDefinition<infer TTarget> ? TTarget : never;
+
 /**
  * Join strategy for relational queries.
  * 
@@ -49,6 +59,41 @@ export type JoinStrategy =
 /**
  * Configuration options for the Relational Query API (`findMany`, `findFirst`).
  */
+export type RelationalWith<TTable> =
+    [keyof NormalizedRelations<TTable>] extends [never]
+    ? Record<string, boolean | RelationalFindOptions<any>>
+    : {
+        [K in keyof NormalizedRelations<TTable>]?: boolean | RelationalFindOptions<RelationTarget<NormalizedRelations<TTable>[K]>>;
+    };
+
+type NestedWith<T> = T extends RelationalFindOptions<any> ? T['with'] : undefined;
+
+type RelationValue<TRel, TWith> =
+    TRel extends { relation: 'one'; table: infer TRelTable }
+    ? RelationalResult<TRelTable, TWith> | null
+    : TRel extends { relation: 'many'; table: infer TRelTable }
+    ? Array<RelationalResult<TRelTable, TWith>>
+    : never;
+
+type RelationValueForKey<TTable, K, TWithValue> =
+    K extends keyof NormalizedRelations<TTable>
+    ? TWithValue extends boolean
+    ? RelationValue<NormalizedRelations<TTable>[K], undefined>
+    : TWithValue extends RelationalFindOptions<any>
+    ? RelationValue<NormalizedRelations<TTable>[K], NestedWith<TWithValue>>
+    : never
+    : any;
+
+export type RelationalResult<TTable, TWith = undefined> = Simplify<
+    CleanSelect<TTable> &
+    (TWith extends RelationalWith<TTable>
+        ? {
+            [K in keyof TWith]:
+                RelationValueForKey<TTable, K, TWith[K]>;
+        }
+        : {})
+>;
+
 export type RelationalFindOptions<TTable = any> = {
     /** 
      * Filter conditions for the main query.
@@ -74,7 +119,7 @@ export type RelationalFindOptions<TTable = any> = {
      * 
      * @example with: { posts: { limit: 5 }, profile: true }
      */
-    with?: Record<string, boolean | RelationalFindOptions>;
+    with?: RelationalWith<TTable>;
     
     /**
      * Join strategy for related data.
@@ -88,6 +133,17 @@ export type RelationalFindOptions<TTable = any> = {
      * @default 'auto'
      */
     joinStrategy?: JoinStrategy;
+};
+
+export type RelationalAPI<TSchema extends Record<string, TableDefinition<any>>> = {
+    [K in keyof TSchema]: {
+        findMany: <TOpts extends RelationalFindOptions<TSchema[K]> | undefined>(
+            opts?: TOpts
+        ) => Promise<Array<RelationalResult<TSchema[K], TOpts extends RelationalFindOptions<TSchema[K]> ? TOpts['with'] : undefined>>>;
+        findFirst: <TOpts extends RelationalFindOptions<TSchema[K]> | undefined>(
+            opts?: TOpts
+        ) => Promise<RelationalResult<TSchema[K], TOpts extends RelationalFindOptions<TSchema[K]> ? TOpts['with'] : undefined> | null>;
+    }
 };
 
 /**
@@ -124,7 +180,10 @@ function isDistributedTable(tableDef: TableDefinition<any>): boolean {
  * @param client - The ClickHouse client instance.
  * @param schema - The shared schema definition containing all table and relation metadata.
  */
-export function buildRelationalAPI(client: any, schema?: Record<string, TableDefinition<any>>) {
+export function buildRelationalAPI<TSchema extends Record<string, TableDefinition<any>>>(
+    client: any,
+    schema?: TSchema
+): RelationalAPI<TSchema> | undefined {
     if (!schema) return undefined;
     const api: Record<string, any> = {};
 
@@ -367,5 +426,5 @@ export function buildRelationalAPI(client: any, schema?: Record<string, TableDef
             }
         };
     }
-    return api;
+    return api as RelationalAPI<TSchema>;
 }

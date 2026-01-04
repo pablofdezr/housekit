@@ -21,6 +21,8 @@ const users: TableDefinition<typeof columns> = {
     $table: 'users',
     $columns: columns,
     $options: {} as any,
+    $inferSelect: undefined as any,
+    $inferInsert: undefined as any,
     toSQL: () => 'users',
     as: (alias: string) => users as any,
     ...columns // Spread columns to satisfy TCols intersection
