@@ -116,7 +116,30 @@ export type InferInsertModel<T extends { $columns: TableColumns }> = TableInsert
     (): TableInsert<T['$columns']>;
 };
 
+// @internal - Used internally for clean autocomplete
+export type CleanInsert<T extends { $inferInsert?: any }> = T extends { $inferInsert?: infer I } ? I : never;
+
+// @internal - Used internally for clean autocomplete
+export type CleanSelect<T extends { $inferSelect?: any }> = T extends { $inferSelect?: infer S } ? S : never;
+
+export type InferInsertValue<TCols extends TableColumns, K extends keyof TCols> =
+  TCols[K] extends ClickHouseColumn<infer Type, infer NotNull, any>
+    ? NotNull extends true
+      ? Type
+      : Type | undefined | null
+    : never;
+
 export type TableInsertArray<T extends TableDefinition<TableColumns>> = T['$inferInsert'][];
+
+export type TableModel<T extends TableDefinition<TableColumns>> = PublicSelectModel<T>;
+
+export type InsertModel<T extends TableDefinition<TableColumns>> = PublicInsertModel<T>;
+
+type PublicSelectModel<T extends TableDefinition<TableColumns>> = {
+    [K in keyof T['$columns']]: GetColumnType<T['$columns'][K]>
+};
+
+type PublicInsertModel<T extends TableDefinition<TableColumns>> = TableInsert<T['$columns']>;
 
 export type TableDefinition<TCols extends TableColumns, TOptions = TableOptions> = {
     $table: string;

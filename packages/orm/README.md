@@ -178,11 +178,7 @@ await repository.insertEvents([
 ]);
 ```
 
-### How It Works
-
-When you write `table.$inferInsert`, it includes a callable signature. TypeScript interprets `table[]` as invoking that callable and applying the array type, giving you `TableInsert<T>[]` automatically.
-
-### Alternative Approaches
+### Type Helpers
 
 ```typescript
 import { TableInsertArray } from '@housekit/orm';
@@ -198,7 +194,7 @@ async insertEvents(events: typeof salesEvents.$inferInsert[]) {
 }
 ```
 
-**Recommended**: Use `table[]` for the cleanest, most ergonomic DX.
+**Note**: Autocomplete shows clean data types by default without exposing internal types.
 
 ---
 

@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from '@clickhouse/client';
-import { ClickHouseColumn, type TableDefinition, type TableInsert, type TableColumns } from '../core';
+import { ClickHouseColumn, type TableDefinition, type TableInsert, type TableColumns, type CleanInsert } from '../core';
 import { buildInsertPlan, processRowsStream, type InsertPlan } from '../utils/insert-processing';
 import { createBatchTransformStream, type BatchTransformOptions } from '../utils/batch-transform';
 import { SyncBinarySerializer } from '../utils/binary-worker-pool';
@@ -117,9 +117,14 @@ export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns
         }
     }
 
-    values(value: TableInsert<TTable['$columns']> | Array<TableInsert<TTable['$columns']>> | Iterable<TableInsert<TTable['$columns']>> | AsyncIterable<TableInsert<TTable['$columns']>> | Readable) {
+    values(value: CleanInsert<TTable> | Array<CleanInsert<TTable>> | Iterable<CleanInsert<TTable>> | AsyncIterable<CleanInsert<TTable>> | Readable) {
         this._values = value as any;
         return this;
+    }
+
+    /** @template [T = CleanInsert<TTable>] */
+    async insert(data: CleanInsert<TTable> | CleanInsert<TTable>[]) {
+        return this.values(data as any);
     }
 
     /** 
@@ -179,14 +184,14 @@ export class ClickHouseInsertBuilder<TTable extends TableDefinition<TableColumns
 
     /**
      * Add a row to the background batcher.
-     * 
+     *
      * If batching is not yet configured, it will use default settings
      * (10,000 rows or 5 seconds).
-     * 
-     * Note: This method is "fire-and-forget" and does not wait for 
+     *
+     * Note: This method is "fire-and-forget" and does not wait for
      * the database to acknowledge the insert.
      */
-    async append(row: TableInsert<TTable['$columns']>) {
+    async append(row: CleanInsert<TTable>) {
         if (!this._batchConfig) {
             this.batch();
         }
