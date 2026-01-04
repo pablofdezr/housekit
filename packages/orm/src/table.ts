@@ -112,6 +112,8 @@ export type InferSelectModel<T extends { $columns: TableColumns }> = { [K in key
 
 export type InferInsertModel<T extends { $columns: TableColumns }> = TableInsert<T['$columns']> & {
     (): TableInsert<T['$columns']>;
+    (): TableInsert<T['$columns']>[];
+    (): TableInsert<T['$columns']>;
 };
 
 export type TableDefinition<TCols extends TableColumns, TOptions = TableOptions> = {
