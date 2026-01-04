@@ -149,8 +149,8 @@ export type TableDefinition<TCols extends TableColumns, TOptions = TableOptions>
     toSQLs?(): string[];
     as(alias: string): TableDefinition<TCols, TOptions>;
     // Phantom types for inference
-    $inferSelect: InferSelectModel<{ $columns: TCols }>;
-    $inferInsert: InferInsertModel<{ $columns: TCols }>;
+    readonly $inferSelect: InferSelectModel<{ $columns: TCols }>;
+    readonly $inferInsert: InferInsertModel<{ $columns: TCols }>;
 } & TCols;
 
 // Internal table shape for cleaner public signatures.
@@ -163,8 +163,8 @@ export type TableRuntime<TInsert = any, TSelect = any, TOptions = TableOptions> 
     toSQLs?(): string[];
     as(alias: string): TableRuntime<TInsert, TSelect, TOptions>;
     // Phantom types for inference
-    $inferSelect: TSelect;
-    $inferInsert: TInsert;
+    readonly $inferSelect: TSelect;
+    readonly $inferInsert: TInsert;
 };
 
 export interface VersionedMeta {
@@ -348,9 +348,6 @@ export function chTable<T extends Record<string, ClickHouseColumn<any, any, any>
         $table: tableName,
         $columns: columns,
         $options: finalOptions,
-        // Phantom types for inference
-        $inferSelect: undefined as any,
-        $inferInsert: undefined as any,
         toSQL: () => {
             if (finalOptions.externallyManaged) {
                 return ''; // No SQL for externally managed tables

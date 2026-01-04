@@ -13,8 +13,8 @@ HouseKit ORM is a modern database toolkit designed specifically for ClickHouse. 
 
 ## 🚀 Key Features
 
-- **🛡️ First-Class TypeScript**: Full type inference for every query. If it compiles, the schema matches your DB.
-- **🏎️ Automatic Turbo Mode**: Native `RowBinary` serialization by default. Bypasses the overhead of JSON parsing for **5-10x faster inserts**.
+- **🛡️ First-Class TypeScript**: Full type inference for every query. Schema definition acts as the single source of truth.
+- **🏎️ Automatic Turbo Mode**: Native `RowBinary` serialization is used automatically when possible. Bypasses the overhead of JSON parsing for **5-10x faster inserts**.
 - **🏗️ ClickHouse Native Engines**: Fluent DSL for `MergeTree`, `ReplacingMergeTree`, `SummingMergeTree`, `Distributed`, `Buffer`, and more.
 - **🔍 Advanced Analytics**: Specialized support for `ASOF JOIN`, `ARRAY JOIN`, `PREWHERE`, and complex Window Functions.
 - **🤝 Smart Relational API**: Query relations using `groupArray` internally, preventing row duplication and keeping data transfer lean.
@@ -35,10 +35,11 @@ bun add @housekit/orm @clickhouse/client
 
 ## ⚡️ Quick Start
 
-### 1. Define your Table
-Use the fluent `defineTable` API. All columns are **NOT NULL** by default, following ClickHouse best practices.
+### 1. Define your Table & Export Types
+Use the fluent `defineTable` API. You can export the inferred types directly from the schema definition thanks to **Phantom Types**.
 
 ```typescript
+// schema.ts
 import { defineTable, t, Engine } from '@housekit/orm';
 
 export const webEvents = defineTable('web_events', {
@@ -47,7 +48,7 @@ export const webEvents = defineTable('web_events', {
   url: t.string('url'),
   revenue: t.decimal('revenue', 18, 4).default(0),
   tags: t.array(t.string('tag')),
-  metadata: t.json('metadata'), // Native JSON type support
+  metadata: t.json('metadata'),
   at: t.datetime('at').default('now()'),
 }, {
   engine: Engine.MergeTree(),
@@ -55,27 +56,34 @@ export const webEvents = defineTable('web_events', {
   partitionBy: 'toYYYYMM(at)',
   ttl: 'at + INTERVAL 1 MONTH'
 });
+
+// ✨ Export inferred types directly
+export type WebEvent = typeof webEvents.$inferSelect;
+export type NewWebEvent = typeof webEvents.$inferInsert;
 ```
 
 ### 2. Connect and Query
 HouseKit automatically picks up configuration from your environment or `housekit.config.ts`.
 
 ```typescript
-import { createClient, eq, and, gte, sql } from '@housekit/orm';
+import { createClient, sql } from '@housekit/orm';
+import { webEvents } from './schema';
 
 const db = await createClient();
 
-// Fully typed result inference
+// Fully typed result inference.
+// No need to call .then() or .execute(), just await the builder!
 const results = await db.select({
     id: webEvents.id,
     path: webEvents.url,
     total: sql<number>`sum(${webEvents.revenue})`
   })
   .from(webEvents)
-  .where(and(
-    eq(webEvents.eventType, 'sale'),
-    gte(webEvents.at, new Date('2024-01-01'))
-  ))
+  .where({
+    // Object syntax implicitly uses AND operator
+    eventType: 'sale',
+    url: '/checkout'
+  })
   .groupBy(webEvents.id, webEvents.url)
   .limit(10);
 ```
@@ -106,7 +114,6 @@ export const users = defineTable('users', {
   engine: Engine.ReplacingMergeTree('version'),
   
   // Portability: '{cluster}' references the server-side macro.
-  // This allows your schema to be environment-agnostic.
   onCluster: '{cluster}', 
   
   orderBy: 'id'
@@ -134,9 +141,10 @@ export const userCache = defineDictionary('user_dict', {
 ## 🚀 High-Performance Data Ingestion
 
 ### Automatic Turbo Mode (RowBinary)
-When you call `db.insert()`, HouseKit analyzes your schema. If all types are compatible, it automatically switches to **Turbo Mode**, using native binary serialization instead of JSON.
+When you call `db.insert()`, HouseKit analyzes your schema. If types are compatible, it automatically switches to **Turbo Mode**, using native binary serialization instead of JSON.
 
 ```typescript
+// Clean syntax: No .execute() needed. Just await.
 await db.insert(webEvents).values([
   { id: '...', eventType: 'click', revenue: 0, metadata: { browser: 'chrome' } },
   { id: '...', eventType: 'purchase', revenue: 99.90, metadata: { browser: 'safari' } },
@@ -155,59 +163,28 @@ const builder = db.insert(webEvents)
   });
 
 // Add rows to the background queue.
-// Proccessing and flushing happen automatically.
+// Processing and flushing happen automatically.
+// Returns immediately (Fire-and-forget).
 await builder.append(row1);
 await builder.append(row2);
 ```
 
 ---
 
-## 🛠️ Type-Safe Inserts
+## 🛠️ Zero-Config Type Safety
 
-### Simple Repository Pattern
+Because we use **Phantom Types**, you don't need to import generic helpers like `Infer<T>` in your application code. You can use `typeof table.$infer...` or the types you exported from your schema file.
 
-```typescript
-import type { InferInsert } from '@housekit/orm';
-
-async insertEvents(events: InferInsert<typeof auditEvents>[]) {
-  return await db.insert(auditEvents).values(events);
-}
-
-// Usage
-await repository.insertEvents([
-  { venueId: 'venue-1', ingredientId: 'ing-1', type: 'restock', quantity: 100, at: new Date() },
-  { venueId: 'venue-2', ingredientId: 'ing-2', type: 'sale', quantity: -50, at: new Date(), referenceId: null }
-]);
-```
-
-### Type Helpers
+### In Repository Functions
 
 ```typescript
-import type { TableInsertArray, InferInsert } from '@housekit/orm';
+import { webEvents, type NewWebEvent } from './schema';
 
-// Using the direct helper
-async insertEvents(events: InferInsert<typeof salesEvents>[]) {
-  return await db.insert(salesEvents).values(events);
-}
-
-// Using explicit type helper
-async insertEvents(events: TableInsertArray<typeof salesEvents>) {
-  return await db.insert(salesEvents).values(events);
+async function logEvents(events: NewWebEvent[]) {
+  // Types match automatically
+  return await db.insert(webEvents).values(events);
 }
 ```
-
-### Inline Types (No Extra Exports)
-
-```typescript
-import { users } from './schema';
-import type { Infer } from '@housekit/orm';
-
-function UserCard({ user }: { user: Infer<typeof users> }) {
-  return <div>{user.email}</div>;
-}
-```
-
-**Note**: Autocomplete shows clean data types by default without exposing internal types.
 
 ---
 
@@ -216,26 +193,28 @@ function UserCard({ user }: { user: Infer<typeof users> }) {
 Traditional ORMs produce "Flat Joins" that duplicate data (the Cartesian Product problem). HouseKit's Relational API uses ClickHouse's `groupArray` internally to fetch related data as nested arrays in a single, efficient query.
 
 ```typescript
+// Define relations in your schema first
+import { relations } from '@housekit/orm';
+
+relations(users, ({ many }) => ({
+  posts: many(posts, { fields: [users.id], references: [posts.userId] })
+}));
+
+// Query with nested data
 const usersWithData = await db.query.users.findMany({
+  where: { country: 'US' }, // Object syntax
   with: {
     posts: {
-      where: (p) => eq(p.published, true),
-      limit: 5
-    },
-    profile: true
+      limit: 5,
+      orderBy: { col: posts.createdAt, dir: 'DESC' }
+    }
   },
   limit: 10
 });
 
 // Result structure:
-// [{ id: 1, name: 'Alice', posts: [{ title: '...', ... }], profile: { bio: '...' } }]
+// [{ id: 1, name: 'Alice', posts: [{ title: '...', ... }] }]
 ```
-
-### Advanced Relational Engine
-HouseKit's relational API is optimized for ClickHouse:
-- **Filtered Relations**: Where clauses in `with` blocks are executed server-side using `groupUniqArrayIf`.
-- **Nested Pagination**: Control the size of related collections with `limit` and `offset` directly in the relation config.
-- **Smart Deduplication**: Merges results in-memory to handle row multiplication from complex joins.
 
 ---
 
@@ -250,7 +229,7 @@ const conditions = [
   gte(users.age, 18)
 ];
 
-const query = db.select()
+const query = await db.select()
   .from(users)
   .where(sql.join(conditions, sql` AND `));
 ```
@@ -273,7 +252,9 @@ const matched = await db.select()
 Essential for distributed setups to avoid local-data-only results on sharded clusters.
 
 ```typescript
-db.select().from(distributedTable).globalJoin(rightTable, condition);
+await db.select()
+  .from(distributedTable)
+  .globalJoin(rightTable, condition);
 ```
 
 ---

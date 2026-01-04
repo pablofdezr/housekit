@@ -165,7 +165,7 @@ export class ClickHouseQueryBuilder<
 
             for (const [key, value] of Object.entries(expression as Record<string, any>)) {
                 const column = table[key] || columns?.[key];
-                if (column) {
+                if (column && value !== undefined) {
                     chunks.push(eq(column, value));
                 }
             }

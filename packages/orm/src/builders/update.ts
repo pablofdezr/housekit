@@ -1,6 +1,8 @@
 import type { ClickHouseClient } from '@clickhouse/client';
 import type { SQLExpression } from '../expressions';
-import { ClickHouseColumn, type TableRuntime } from '../core';
+import { eq } from '../expressions';
+import { and } from '../modules/conditional';
+import { ClickHouseColumn, type TableRuntime, type InferSelectModel } from '../core';
 
 export class ClickHouseUpdateBuilder<TTable extends TableRuntime<any, any>> {
     private _set: Record<string, any> = {};
@@ -17,8 +19,29 @@ export class ClickHouseUpdateBuilder<TTable extends TableRuntime<any, any>> {
         return this;
     }
 
-    where(expression: SQLExpression) {
-        this._where = expression;
+    where(expression: SQLExpression | Partial<InferSelectModel<{ $columns: TTable['$columns'] }>> | undefined | null) {
+        if (!expression) return this;
+
+        if (typeof expression === 'object' && 'toSQL' in expression) {
+            this._where = expression as SQLExpression;
+            return this;
+        }
+
+        if (typeof expression === 'object') {
+            const chunks: SQLExpression[] = [];
+
+            for (const [key, value] of Object.entries(expression as Record<string, any>)) {
+                const column = this.table.$columns[key];
+                if (column && value !== undefined) {
+                    chunks.push(eq(column, value));
+                }
+            }
+
+            if (chunks.length > 0) {
+                const combined = chunks.length === 1 ? chunks[0] : and(...chunks);
+                if (combined) this._where = combined;
+            }
+        }
         return this;
     }
 

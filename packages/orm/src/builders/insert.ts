@@ -107,14 +107,9 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
         private client: ClickHouseClient,
         private table: TTable
     ) {
-        // Auto-manage async_insert based on table options
+        // Auto-manage async_insert based on table options (default: async for best performance)
         if (table.$options?.asyncInsert !== undefined) {
             this._async = table.$options.asyncInsert;
-        } else if (table.$options?.appendOnly) {
-            this._async = true;
-        } else {
-            // Default to sync for non-append-only tables to ensure durability
-            this._async = false;
         }
     }
 
