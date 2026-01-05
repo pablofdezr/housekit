@@ -62,7 +62,7 @@ export interface BinaryInsertConfig {
 
 export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TReturn = any> {
     private _values: Array<CleanInsert<TTable>> | Iterable<CleanInsert<TTable>> | AsyncIterable<CleanInsert<TTable>> | Readable | null = null;
-    private _async: boolean = true;  // DEFAULT: async_insert enabled for best performance
+    private _async: boolean = false;  // DEFAULT: sync insert for best performance with small/medium batches
     private _waitForAsync: boolean = true;
     private _batchOptions: BatchTransformOptions = {};
     private _format: InsertFormat = 'auto'; // DEFAULT: auto (prefers json)

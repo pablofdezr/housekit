@@ -164,30 +164,24 @@ orderBy: [desc(users.createdAt), asc(users.name)]
 
 ## 🚀 High-Performance Inserts
 
-### Default Insert
+### Default Insert (Sync Mode)
+
+HouseKit uses synchronous inserts by default for maximum speed:
 
 ```typescript
-// Standard insert (no data returned)
+// Standard insert - uses sync mode automatically
 await db.insert(events).values([
   { type: 'click', userId: '...' },
   { type: 'view', userId: '...' },
 ]);
 ```
 
-### Sync Insert (Fastest for Small Batches)
+### Async Insert (Server-Side Batching)
 
-Use `.syncInsert()` for maximum speed with batches under 5k rows:
-
-```typescript
-await db.insert(events).values(data).syncInsert();
-```
-
-### JSONCompact Format
-
-Use `.useCompactFormat()` for better performance with larger batches:
+Use `.asyncInsert()` when you want ClickHouse to batch writes internally:
 
 ```typescript
-await db.insert(events).values(data).useCompactFormat();
+await db.insert(events).values(data).asyncInsert();
 ```
 
 ### JSON Insert with Returning
@@ -208,12 +202,6 @@ const [user1, user2] = await db
   .insert(users)
   .values([{ email: 'a@b.com' }, { email: 'b@c.com' }])
   .returning();
-```
-
-### Force JSON Format
-
-```typescript
-await db.insert(events).values(data).useJsonFormat();
 ```
 
 ### Background Batching
@@ -320,18 +308,18 @@ Performance tested on local ClickHouse (Docker) with Bun runtime:
 
 | Rows | Method | Time | Throughput |
 |------|--------|------|------------|
-| 1,000 | JSON | 78ms | 12,821 rows/sec |
-| 1,000 | JSONCompact | 67ms | 14,925 rows/sec |
-| 1,000 | Sync Insert | 12ms | 83,333 rows/sec |
-| 5,000 | JSON | 108ms | 46,296 rows/sec |
-| 5,000 | JSONCompact | 56ms | 89,286 rows/sec |
-| 10,000 | JSON | 171ms | 58,480 rows/sec |
-| 10,000 | JSONCompact | 158ms | 63,291 rows/sec |
+| 1,000 | JSON | 19ms | 52,632 rows/sec |
+| 1,000 | JSON Sync | 13ms | 76,923 rows/sec |
+| 5,000 | JSON | 118ms | 42,373 rows/sec |
+| 5,000 | JSON Sync | 54ms | 92,593 rows/sec |
+| 10,000 | JSON | 159ms | 62,893 rows/sec |
+| 10,000 | JSON Sync | 161ms | 62,112 rows/sec |
 
 Key findings:
-- **Sync insert** is fastest for small batches (<5k rows) - up to 6x faster
-- **JSONCompact** provides ~2x improvement for medium batches
-- For high-throughput scenarios, use `.syncInsert()` with batching
+- **Sync insert is the default** - fastest for most use cases
+- For batches <5k rows, sync is up to **2x faster**
+- For larger batches (10k+), performance is similar
+- Use `.asyncInsert()` only when you need server-side batching
 
 Run the benchmark yourself:
 ```bash
@@ -372,53 +360,6 @@ const db = housekit({
 
 // Per-insert
 await db.insert(events).values(data).skipValidation();
-```
-
-### Object Pooling
-
-HouseKit automatically pools `BinaryWriter` instances to reduce GC pressure. For advanced use cases:
-
-```typescript
-import { acquireWriter, releaseWriter } from '@housekit/orm';
-
-const writer = acquireWriter();
-try {
-  // Use writer for custom serialization
-} finally {
-  releaseWriter(writer);
-}
-```
-
-### Optimized Serialization
-
-For maximum performance with large batches:
-
-```typescript
-import { 
-  buildOptimizedBinaryConfig, 
-  serializeRowsOptimized 
-} from '@housekit/orm';
-
-// Pre-compile accessors once
-const config = buildOptimizedBinaryConfig(columns, { 
-  skipValidation: true 
-});
-
-// Serialize batches with pooled writer + pre-compiled accessors
-const buffer = serializeRowsOptimized(rows, config);
-```
-
-### TypedArray for Numeric Data
-
-For schemas with mostly numeric columns:
-
-```typescript
-import { isNumericHeavySchema, serializeNumericBatch } from '@housekit/orm';
-
-if (isNumericHeavySchema(columns)) {
-  // Uses Float64Array for better memory layout
-  const { numericBuffer, otherData } = serializeNumericBatch(rows, config, numericIndices);
-}
 ```
 
 ---
