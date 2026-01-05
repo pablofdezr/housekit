@@ -2,7 +2,7 @@ import type { ClickHouseClientConfigOptions } from '@clickhouse/client';
 import { resolve, join } from 'path';
 import { existsSync, readdirSync } from 'fs';
 import { type TableDefinition, type TableColumns } from './core';
-import { createClientFromConfigObject, createHousekitClient, type ClientConfigWithSchema, type HousekitClient as HousekitClientType, type HousekitClientConfig, type HousekitClient } from './client';
+import { createClientFromConfigObject, createHousekitClient, type ClientConfigWithSchema, type HousekitClientConfig, type HousekitClient } from './client';
 import { generateSelectSchema, generateInsertSchema } from './codegen/zod';
 
 // Export core types and utilities explicitly
@@ -155,7 +155,7 @@ export async function createClientFromConfig(databaseName: string = 'default'): 
 export function housekit<TSchema extends Record<string, TableDefinition<any>> = Record<string, TableDefinition<any>>>(
     config: HousekitClientConfig,
     options?: { schema?: TSchema }
-): HousekitClientType<TSchema> {
+): HousekitClient<TSchema> {
     return createHousekitClient({
         ...config,
         schema: options?.schema
@@ -213,14 +213,13 @@ async function loadConfig(): Promise<HouseKitConfig> {
     throw new Error('housekit.config.{ts,js,mjs,cjs} not found in workspace.');
 }
 
-// Re-export the generic HousekitClient type for external use
-export type { HousekitClient };
+// HousekitClient is exported via `export * from './client'`
 
 // Public API: createClient can accept either a config object, a database name string, or nothing (defaults to 'default')
-export function createClient(): Promise<HousekitClientType>;
-export function createClient(config: ClientConfigWithSchema): HousekitClientType;
-export function createClient(databaseName: string): Promise<HousekitClientType>;
-export function createClient(configOrName?: ClientConfigWithSchema | string): HousekitClientType | Promise<HousekitClientType> {
+export function createClient(): Promise<HousekitClient>;
+export function createClient(config: ClientConfigWithSchema): HousekitClient;
+export function createClient(databaseName: string): Promise<HousekitClient>;
+export function createClient(configOrName?: ClientConfigWithSchema | string): HousekitClient | Promise<HousekitClient> {
     // If no argument provided, use 'default' database
     if (configOrName === undefined) {
         return createClientFromConfig('default');

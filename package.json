@@ -26,9 +26,9 @@
     "release:all": "node scripts/bump-changed-versions.cjs && bun run build:packages && node scripts/publish-changed.cjs"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^20.19.27",
     "bun-types": "latest",
-    "turbo": "^2.7.2",
-    "typescript": "^5.0.0"
+    "turbo": "^2.7.3",
+    "typescript": "^5.9.3"
   }
 }
