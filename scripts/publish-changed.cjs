@@ -55,6 +55,34 @@ console.log('='.repeat(60));
 fs.unlinkSync(bumpedPackagesPath);
 console.log('\n🧹 Cleaned up .bumped-packages.json');
 
+// Commit and tag changes
+if (successCount > 0) {
+    console.log('\n🏷️  Commiting and tagging changes...');
+    try {
+        // Add all changed package.json files
+        for (const pkg of bumpedPackages) {
+            const pkgPath = path.join(__dirname, '..', 'packages', pkg.path, 'package.json');
+            execSync(`git add ${pkgPath}`, { stdio: 'inherit' });
+        }
+
+        // Commit
+        const packageNames = bumpedPackages.map(p => `${p.name}@${p.version}`).join(', ');
+        execSync(`git commit -m "release: ${packageNames}"`, { stdio: 'inherit' });
+
+        // Tag each package
+        for (const pkg of bumpedPackages) {
+            const tagName = `${pkg.name}@${pkg.version}`;
+            execSync(`git tag -a ${tagName} -m "${tagName}"`, { stdio: 'inherit' });
+            console.log(`  ✅ Tagged ${tagName}`);
+        }
+
+        console.log('\n✨ All changes committed and tagged.');
+        console.log('   Run "git push origin main --follow-tags" to sync with GitHub.');
+    } catch (error) {
+        console.error(`\n❌ Failed to commit or tag: ${error.message}`);
+    }
+}
+
 if (failCount > 0) {
     process.exit(1);
 }
