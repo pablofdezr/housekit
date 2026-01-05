@@ -80,10 +80,10 @@ const userById = await db.query.users.findById('uuid-here');
 await db.insert(schema.users).values({ email: 'a@b.com', role: 'admin' });
 
 // JSON insert with returning data
-const [created] = await db
+const created = await db
   .insert(schema.users)
   .values({ email: 'a@b.com', role: 'admin' })
-  .returning();
+  .returningOne();
 ```
 
 ```typescript

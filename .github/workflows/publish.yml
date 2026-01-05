@@ -72,3 +72,15 @@ jobs:
           git push origin main --follow-tags
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        if: github.event.inputs.version != 'skip'
+        run: |
+          # Get the tags created in this commit/HEAD
+          TAGS=$(git tag --points-at HEAD)
+          for TAG in $TAGS; do
+            echo "Creating release for $TAG"
+            gh release create "$TAG" --generate-notes
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

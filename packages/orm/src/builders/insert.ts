@@ -107,8 +107,25 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
         return this.values(data as any).execute();
     }
 
+    /**
+     * Return inserted data as an array.
+     * Use when inserting multiple rows.
+     */
     returning(): ClickHouseInsertBuilder<TTable, CleanSelect<TTable>[]> {
         this._returning = true;
+        return this as any;
+    }
+
+    /**
+     * Return the single inserted row directly (not wrapped in array).
+     * Use when inserting a single value for cleaner syntax.
+     * 
+     * @example
+     * const user = await db.insert(users).values({ email: 'a@b.com' }).returningOne();
+     */
+    returningOne(): ClickHouseInsertBuilder<TTable, CleanSelect<TTable>> {
+        this._returning = true;
+        this._isSingle = true;
         return this as any;
     }
 

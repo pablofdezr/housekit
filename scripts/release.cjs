@@ -261,6 +261,34 @@ function publishPackage(packageName) {
 }
 
 /**
+ * Commit and tag a package release
+ */
+function tagPackage(packageName, version) {
+    const pkgInfo = PACKAGES[packageName];
+    const tagName = `${pkgInfo.name}@${version}`;
+    const pkgPath = path.join(pkgInfo.path, 'package.json');
+
+    console.log(`\n🏷️  Tagging ${tagName}...`);
+
+    try {
+        // Add package.json
+        execSync(`git add ${pkgPath}`, { stdio: 'inherit' });
+
+        // Commit
+        const commitMsg = `release: ${tagName}`;
+        execSync(`git commit -m "${commitMsg}"`, { stdio: 'inherit' });
+
+        // Tag
+        execSync(`git tag -a ${tagName} -m "${tagName}"`, { stdio: 'inherit' });
+
+        console.log(`   ✅ Committed and tagged: ${tagName}`);
+    } catch (error) {
+        console.error(`   ❌ Failed to tag ${tagName}: ${error.message}`);
+        // Don't throw here, continue with other packages if any
+    }
+}
+
+/**
  * Main function
  */
 function main() {
@@ -289,6 +317,11 @@ function main() {
             for (const pkg of args.packages) {
                 publishPackage(pkg);
             }
+        }
+
+        // Tag after publish (or even if no publish, as long as bumped)
+        for (const pkg of args.packages) {
+            tagPackage(pkg, versions[pkg]);
         }
 
         console.log('\n✨ Release completed successfully!');

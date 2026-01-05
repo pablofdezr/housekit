@@ -178,15 +178,22 @@ await db.insert(events).values([
 
 ### JSON Insert with Returning
 
-Use `.returning()` when you need the inserted data back:
+Use `.returningOne()` for single inserts or `.returning()` for multiple:
 
 ```typescript
-const [user] = await db
+// Single insert
+const user = await db
   .insert(users)
   .values({ email: 'a@b.com', role: 'admin' })
-  .returning();
+  .returningOne();
 
 console.log(user.id); // Generated UUID
+
+// Multiple inserts
+const [user1, user2] = await db
+  .insert(users)
+  .values([{ email: 'a@b.com' }, { email: 'b@c.com' }])
+  .returning();
 ```
 
 ### Force JSON Format
