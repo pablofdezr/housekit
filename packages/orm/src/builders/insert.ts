@@ -77,7 +77,7 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
         private table: TTable,
         private connectionConfig?: BinaryInsertConfig
     ) {
-        // Auto-manage async_insert based on table options (default: async for best performance)
+        // Auto-manage async_insert based on table options
         if (table.$options?.asyncInsert !== undefined) {
             this._async = table.$options.asyncInsert;
         }
@@ -140,10 +140,7 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
 
     /** 
      * Force synchronous insert (disables async_insert).
-     * Use when you need immediate durability guarantee.
-     * 
-     * Note: By default, HouseKit uses async_insert for better performance.
-     * The data is still durable, but ClickHouse batches writes internally.
+     * This is already the default in HouseKit for best performance.
      */
     syncInsert() {
         this._async = false;
@@ -151,9 +148,11 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
     }
 
     /**
-     * Enables asynchronous inserts on the server.
+     * Enable asynchronous inserts on the server (not the default).
      * ClickHouse will batch multiple small inserts into a single disk operation.
-     * Ideal for high-frequency logs or events.
+     * 
+     * Note: Sync insert is faster for most use cases. Use async only when
+     * you need server-side batching for very high-frequency writes.
      */
     asyncInsert(waitForCompletion = true) {
         this._async = true;
@@ -225,16 +224,13 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
     }
 
     /**
-     * Force JSON format (useful for debugging or compatibility).
-     * 
-     * Note: HouseKit uses RowBinary by default for maximum performance.
-     * Only use this when you need human-readable output or debugging.
+     * Use JSON format explicitly (this is already the default).
      * 
      * @example
      * ```typescript
      * await db.insert(events)
      *   .values(rows)
-     *   .useJsonFormat() // For debugging
+     *   .useJsonFormat()
      *   .execute();
      * ```
      */
@@ -245,7 +241,7 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
     }
 
     /**
-     * Force JSONCompactEachRow format (smaller than JSON, but slower than binary).
+     * Use JSONCompactEachRow format (smaller payload than JSON).
      */
     useCompactFormat() {
         this._format = 'compact';
@@ -253,8 +249,8 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
     }
 
     /**
-     * Force RowBinary format (this is already the default via 'auto').
-     * Explicit call for documentation purposes.
+     * Force RowBinary format.
+     * Uses direct HTTP request (bypasses official client).
      */
     useBinaryFormat() {
         this._format = 'binary';
@@ -262,9 +258,8 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
     }
 
     /**
-     * Activates "Turbo Mode" (RowBinary).
-     * Sends data in native binary format, skipping JSON parsing on the server.
-     * Up to 5x faster than normal insertion.
+     * Alias for useBinaryFormat().
+     * @deprecated Binary format is not faster than JSON with the official client.
      */
     turbo() {
         return this.useBinaryFormat();
