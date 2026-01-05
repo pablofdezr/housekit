@@ -85,6 +85,13 @@ export type RelationDefinition<TTarget extends TableDefinition<any> = TableDefin
 
 export type TableColumns = Record<string, ClickHouseColumn<any, any, any>>;
 
+/**
+ * Utility to force TypeScript to expand computed types for cleaner tooltips.
+ */
+export type Prettify<T> = {
+    [K in keyof T]: T[K];
+} & {};
+
 export type TableRow<TCols extends TableColumns> = {
     [K in keyof TCols]: TCols[K] extends ClickHouseColumn<infer T, infer NotNull, any>
     ? NotNull extends true
@@ -108,9 +115,13 @@ type GetColumnType<T extends ClickHouseColumn> = T extends ClickHouseColumn<infe
     ? IsNotNull extends true ? Type : Type | null
     : never;
 
-export type InferSelectModel<T extends { $columns: TableColumns }> = { [K in keyof T['$columns']]: GetColumnType<T['$columns'][K]> };
+export type InferSelectModel<T extends { $columns: TableColumns }> = Prettify<{
+    [K in keyof T['$columns']]: GetColumnType<T['$columns'][K]>
+}>;
 
-export type InferInsertModel<T extends { $columns: TableColumns }> = TableInsert<T['$columns']>;
+export type InferInsertModel<T extends { $columns: TableColumns }> = Prettify<
+    TableInsert<T['$columns']>
+>;
 
 type InferInsertFromColumns<T> = T extends { $columns: infer TCols extends TableColumns } ? TableInsert<TCols> : never;
 type InferSelectFromColumns<T> = T extends { $columns: infer TCols extends TableColumns } ? InferSelectModel<{ $columns: TCols }> : never;
