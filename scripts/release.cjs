@@ -282,6 +282,22 @@ function tagPackage(packageName, version) {
         execSync(`git tag -a ${tagName} -m "${tagName}"`, { stdio: 'inherit' });
 
         console.log(`   ✅ Committed and tagged: ${tagName}`);
+
+        // Push tags and create GitHub release
+        console.log(`   🚀 Pushing and creating release for ${tagName}...`);
+        try {
+            execSync('git push origin main --follow-tags', { stdio: 'inherit' });
+
+            // Try to create GH release if gh is installed
+            try {
+                execSync(`gh release create "${tagName}" --generate-notes`, { stdio: 'inherit' });
+                console.log(`   ✅ GitHub release created: ${tagName}`);
+            } catch (err) {
+                console.log(`   ⚠️  Could not create GitHub release (gh cli missing or error): ${err.message}`);
+            }
+        } catch (err) {
+            console.error(`   ❌ Failed to push: ${err.message}`);
+        }
     } catch (error) {
         console.error(`   ❌ Failed to tag ${tagName}: ${error.message}`);
         // Don't throw here, continue with other packages if any

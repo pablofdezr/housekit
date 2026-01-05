@@ -77,7 +77,25 @@ if (successCount > 0) {
         }
 
         console.log('\n✨ All changes committed and tagged.');
-        console.log('   Run "git push origin main --follow-tags" to sync with GitHub.');
+
+        // Push and create GitHub releases
+        console.log('\n🚀 Pushing and creating releases on GitHub...');
+        try {
+            execSync('git push origin main --follow-tags', { stdio: 'inherit' });
+
+            for (const pkg of bumpedPackages) {
+                const tagName = `${pkg.name}@${pkg.version}`;
+                try {
+                    execSync(`gh release create "${tagName}" --generate-notes`, { stdio: 'inherit' });
+                    console.log(`  ✅ GitHub release created: ${tagName}`);
+                } catch (err) {
+                    console.log(`  ⚠️  Could not create GitHub release for ${tagName} (gh cli missing or error): ${err.message}`);
+                }
+            }
+            console.log('\n✨ All releases synchronized with GitHub.');
+        } catch (error) {
+            console.error(`\n❌ Failed to push to GitHub: ${error.message}`);
+        }
     } catch (error) {
         console.error(`\n❌ Failed to commit or tag: ${error.message}`);
     }
