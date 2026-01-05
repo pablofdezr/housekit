@@ -35,7 +35,7 @@ export type Infer<T> = T extends { $inferSelect: infer U } ? U : never;
  */
 export type InferInsert<T> = T extends { $inferInsert: infer U } ? U : never;
 
-export { Engine, type EngineConfiguration } from './engines';
+export { Engine, renderEngineSQL, type EngineConfiguration } from './engines';
 export * from './external';
 
 export * from './expressions';

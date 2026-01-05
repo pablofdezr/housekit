@@ -15,6 +15,7 @@ HouseKit CLI brings a modern, streamlined developer experience to the ClickHouse
 
 - **Declarative Workflows**: Define your source of truth in TypeScript.
 - **Automatic Drift Detection**: Compares your code against the live DB schema instantly.
+- **Engine-Aware Diffing**: Normalizes local engine objects vs. remote SQL to avoid false changes.
 - **Blue-Green Deployments**: Safe, zero-downtime structural changes for Materialized Views and Tables.
 - **Cluster Awareness**: First-class support for sharded clusters using `{cluster}` macros and sharding keys.
 - **Zero Runtime Dependencies**: Powered by `jiti` for native TS loading—no pre-compilation or heavy binaries required.
@@ -104,8 +105,14 @@ export default {
 HouseKit simplifies managing Replicated and Distributed tables across a cluster.
 
 ```typescript
-// Define a table that lives on a cluster
-export const events = defineTable('events', { ... }, {
+import { defineTable, t, Engine } from '@housekit/orm';
+
+// Define a table that lives on a cluster (object syntax still supported)
+export const events = defineTable('events', {
+  id: t.uuid('id').primaryKey(),
+  userId: t.uuid('user_id'),
+  createdAt: t.timestamp('created_at').default('now()'),
+}, {
   engine: Engine.ReplicatedMergeTree(),
   
   // High Portability: Using '{cluster}' tells ClickHouse to use the 
@@ -116,6 +123,9 @@ export const events = defineTable('events', { ... }, {
   shardKey: 'user_id',
   orderBy: 'id'
 });
+
+// Callback syntax is also available when you want presets or composition:
+// defineTable('events', (t) => ({ ... }), { ... })
 ```
 When you run `housekit push`, the CLI automatically detects the cluster configuration and executes the `ALTER` or `CREATE` statements across all nodes using the specified macro.
 
@@ -131,6 +141,7 @@ Have an existing database with 100 tables? Don't write the code by hand.
 bunx housekit pull --database production
 ```
 This will scan your ClickHouse instance and generate a clean, readable `schema.ts` file with all table definitions, engines, and settings preserved.
+Engine strings from ClickHouse are stored as `customEngine` to guarantee a lossless round-trip.
 
 ---
 
