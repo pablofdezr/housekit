@@ -1,4 +1,4 @@
-import { ClickHouseColumn, normalizeHousekitMetadata, upgradeMetadataVersion, type IndexDefinition, type ProjectionDefinition } from '@housekit/orm';
+import { ClickHouseColumn, normalizeHousekitMetadata, upgradeMetadataVersion, renderEngineSQL, type IndexDefinition, type ProjectionDefinition } from '@housekit/orm';
 import { quoteName } from '../ui';
 import type { ParsedCreateOptions, ParsedIndex, ParsedProjection } from './parser';
 
@@ -335,9 +335,22 @@ export function diffTable(
         }
     };
 
-    compare('engine', localOpts.engine || 'MergeTree', remoteOpts.engine, () => {
-        destructiveReasons.push('engine change (requires shadow swap)');
-    });
+    let localEngineSQL = 'MergeTree';
+    if (localOpts.customEngine) {
+        localEngineSQL = localOpts.customEngine;
+    } else if (localOpts.engine) {
+        localEngineSQL = renderEngineSQL(localOpts.engine);
+    }
+
+    const normalizeEngine = (engine: string) => engine.replace(/\s+/g, '').replace(/\(\)/g, '').toLowerCase();
+    const localEngineNorm = normalizeEngine(localEngineSQL);
+    const remoteEngineNorm = normalizeEngine(remoteOpts.engine || 'MergeTree');
+
+    if (localEngineNorm !== remoteEngineNorm) {
+        optionChanges.push('engine');
+        destructiveReasons.push(`engine change (local="${localEngineSQL}", remote="${remoteOpts.engine}") (requires shadow swap)`);
+        warnings.push('Engine mismatch requires full table recreation');
+    }
 
     compare('orderBy', localOpts.orderBy, remoteOpts.orderBy, () => {
         destructiveReasons.push('order by change');

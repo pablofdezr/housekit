@@ -220,9 +220,15 @@ function extractHousekitMetadata(comment: string | null) {
     return null;
 }
 
+function extractEngineFromCreate(statement: string): string {
+    const match = statement.match(/ENGINE\s*=\s*(.+?)(\s+(?:ORDER|PARTITION|PRIMARY|SAMPLE|TTL|SETTINGS|COMMENT)|$)/i);
+    return match ? match[1].trim() : 'MergeTree()';
+}
+
 function buildTableFile(
     table: string,
     columns: ColumnInfo[],
+    engineSQL: string,
     format: 'js' | 'ts' = 'ts',
     metadata?: { version?: string; appendOnly?: boolean; readOnly?: boolean } | null
 ) {
@@ -253,6 +259,8 @@ function buildTableFile(
 
     // Build options block
     const optionLines: string[] = [];
+    const escapedEngine = engineSQL.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    optionLines.push(`    customEngine: "${escapedEngine}"`);
     if (metadata?.version) {
         optionLines.push(`    metadataVersion: "${metadata.version}"`);
     } else {
@@ -528,6 +536,7 @@ export async function pullCommand(options: { database?: string }) {
                 const createStatement = Array.isArray(createRows) && createRows.length > 0
                     ? (createRows[0] as any)?.statement || ''
                     : '';
+                const engineSQL = extractEngineFromCreate(createStatement);
 
                 // Fetch table-level comment directly from system.tables
                 let tableMetadata: { version: string; appendOnly?: boolean; readOnly?: boolean } | null = null;
@@ -715,7 +724,7 @@ export async function pullCommand(options: { database?: string }) {
                     };
                 });
 
-                const content = buildTableFile(tableName, columns, fileFormat, tableMetadata);
+                const content = buildTableFile(tableName, columns, engineSQL, fileFormat, tableMetadata);
                 writeFileSync(join(targetDir, `${tableName}.${fileExtension}`), content);
                 describeSpinner.stop();
                 success(`Wrote schema file for ${quoteName(tableName)}`);

@@ -121,14 +121,14 @@ export default {
         const exampleSchemaContent = `// Example table - This is a sample schema file to demonstrate HouseKit usage
 ${importLine}
 
-export const logs = defineTable('logs', {
+export const logs = defineTable('logs', (t) => ({
     id: t.uuid('id').autoGenerate().primaryKey(),
     message: t.string('message').comment('Log message content'),
     level: t.enum('level', ['info', 'warning', 'error']).default('info').comment('Log severity level'),
     tags: t.array(t.string('tag')).nullable().comment('Array of tags for categorizing logs'),
     metadata: t.json('metadata').nullable().comment('Additional log metadata'),
     createdAt: t.timestamp('created_at').default('now()'),
-}, {
+}), {
     engine: Engine.MergeTree(),
     orderBy: ['createdAt', 'id'],
     appendOnly: false
