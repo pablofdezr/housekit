@@ -91,6 +91,36 @@ export {
     type BinaryWorkerPoolOptions,
 } from './utils/binary-worker-pool';
 
+export interface DatabaseConnection {
+    host?: string;
+    port?: number;
+    database: string;
+    username?: string;
+    password?: string;
+    url?: string; // Alternative: full connection URL
+}
+
+export interface HouseKitConfig {
+    /**
+     * Path to the directory containing your schema files (.ts or .js).
+     * Can be a single path or a mapping for multiple databases.
+     */
+    schema: string | Record<string, string>; // Single path or { dbName: path } mapping
+    /**
+     * Directory where SQL migrations and snapshots will be generated.
+     */
+    out: string;    // Output folder for migrations (e.g., "./housekit")
+    /**
+     * Preferred file format for generated schema files
+     */
+    language?: 'ts' | 'js'; // Preferred file format for generated schema files
+    /**
+     * ClickHouse connection configuration.
+     * Each key represents the database name you will use.
+     */
+    databases: Record<string, DatabaseConnection>;
+}
+
 /**
  * Load housekit.config.js/ts and create a client by name.
  */
@@ -132,16 +162,7 @@ export function createSchema<TCols extends TableColumns>(table: TableDefinition<
 /**
  * Load housekit.config.{ts,js,mjs,cjs}
  */
-async function loadConfig(): Promise<{
-    databases: Record<string, {
-        host?: string;
-        port?: number;
-        database: string;
-        username?: string;
-        password?: string;
-        url?: string;
-    }>;
-}> {
+async function loadConfig(): Promise<HouseKitConfig> {
     const root = process.cwd();
     const extensions = ['ts', 'js', 'mjs', 'cjs'];
 

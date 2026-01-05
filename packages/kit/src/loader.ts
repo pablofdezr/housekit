@@ -1,4 +1,5 @@
 import { resolve } from 'path';
+import { existsSync, statSync, mkdirSync } from 'fs';
 import { globSync, Glob } from 'glob';
 import { info } from './ui';
 import { createJiti } from 'jiti';
@@ -17,9 +18,14 @@ export async function loadSchema(schemaPath: string, options?: { quiet?: boolean
     const patterns = extensions.map(ext => `${schemaPath}/**/*${ext}`);
 
     let allFiles: string[] = [];
-    for (const pattern of patterns) {
-        const files = globSync(pattern);
-        allFiles = allFiles.concat(files);
+
+    if (existsSync(schemaPath) && statSync(schemaPath).isFile()) {
+        allFiles = [schemaPath];
+    } else {
+        for (const pattern of patterns) {
+            const files = globSync(pattern);
+            allFiles = allFiles.concat(files);
+        }
     }
 
     // Process files
@@ -63,7 +69,7 @@ export async function loadSchema(schemaPath: string, options?: { quiet?: boolean
                     `If using npx/bunx, ensure all dependencies are available in your project.`
                 );
             }
-            
+
             throw error;
         }
     }
@@ -132,6 +138,13 @@ export async function loadConfig() {
             error(`Config error [${err.field}]: ${err.message}`);
         }
         throw new Error('Configuration validation failed');
+    }
+
+    // Auto-create output directory if it doesn't exist
+    const outDir = resolve(process.cwd(), config.out);
+    if (!existsSync(outDir)) {
+        mkdirSync(outDir, { recursive: true });
+        info(`Created output directory: ${config.out}`);
     }
 
     return config;

@@ -30,7 +30,7 @@ export function validateConfig(config: HouseKitConfig, options: ValidateConfigOp
     validateRequiredFields(config, errors);
     if (!options.skipPathValidation) {
         validateSchemaPath(config, rootDir, errors, warnings);
-        validateOutPath(config, rootDir, errors);
+        validateOutPath(config, rootDir, errors, warnings);
     }
     validateDatabases(config, errors, warnings);
     validateSchemaMapping(config, errors, warnings);
@@ -84,14 +84,14 @@ function validateSchemaPath(config: HouseKitConfig, rootDir: string, errors: Val
     }
 }
 
-function validateOutPath(config: HouseKitConfig, rootDir: string, errors: ValidationError[]) {
+function validateOutPath(config: HouseKitConfig, rootDir: string, errors: ValidationError[], warnings: ValidationError[]) {
     const fullPath = resolve(rootDir, config.out);
 
     if (!existsSync(fullPath)) {
-        errors.push({
+        warnings.push({
             field: 'out',
             message: `Output directory does not exist: ${config.out}`,
-            severity: 'error'
+            severity: 'warning'
         });
     }
 }

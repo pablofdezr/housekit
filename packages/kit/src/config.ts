@@ -1,30 +1,6 @@
-export interface DatabaseConnection {
-    host?: string;
-    port?: number;
-    database: string;
-    username?: string;
-    password?: string;
-    url?: string; // Alternative: full connection URL
-}
+import type { DatabaseConnection, HouseKitConfig } from '@housekit/orm';
 
-export interface HouseKitConfig {
-    /**
-     * Path to the directory containing your schema files (.ts or .js).
-     * Can be a single path or a mapping for multiple databases.
-     */
-    schema: string | Record<string, string>; // Single path or { dbName: path } mapping
-    /**
-     * Directory where SQL migrations and snapshots will be generated.
-     */
-    out: string;    // Output folder for migrations (e.g., "./housekit")
-    language?: 'ts' | 'js'; // Preferred file format for generated schema files
-
-    /**
-     * ClickHouse connection configuration.
-     * Each key represents the database name you will use in the CLI with `--database`.
-     */
-    databases: Record<string, DatabaseConnection>;
-}
+export type { DatabaseConnection, HouseKitConfig };
 
 // Default export as plain object (no helper needed)
 export type { HouseKitConfig as default };

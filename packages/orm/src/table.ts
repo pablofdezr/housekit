@@ -101,13 +101,25 @@ export type TableRow<TCols extends TableColumns> = {
 };
 
 export type TableInsert<TCols extends TableColumns> = {
-    [K in keyof TCols as TCols[K] extends ClickHouseColumn<any, infer NotNull, infer Auto>
-    ? NotNull extends true
+    [K in keyof TCols as TCols[K] extends ClickHouseColumn<any, any, infer Auto>
     ? Auto extends true
     ? never
     : K
-    : K
-    : never]: TCols[K] extends ClickHouseColumn<infer T, any, any> ? T : never
+    : never]: TCols[K] extends ClickHouseColumn<infer T, infer NotNull, any>
+    ? NotNull extends true
+    ? T
+    : T | null
+    : never
+} & {
+    [K in keyof TCols as TCols[K] extends ClickHouseColumn<any, any, infer Auto>
+    ? Auto extends true
+    ? K
+    : never
+    : never]?: TCols[K] extends ClickHouseColumn<infer T, infer NotNull, any>
+    ? NotNull extends true
+    ? T
+    : T | null
+    : never
 };
 
 // Helper to extract the TypeScript type from a ClickHouseColumn
@@ -133,10 +145,10 @@ export type CleanInsert<T> = T extends { $inferInsert: infer I } ? I : InferInse
 export type CleanSelect<T> = T extends { $inferSelect: infer S } ? S : InferSelectFromColumns<T>;
 
 export type InferInsertValue<TCols extends TableColumns, K extends keyof TCols> =
-  TCols[K] extends ClickHouseColumn<infer Type, infer NotNull, any>
+    TCols[K] extends ClickHouseColumn<infer Type, infer NotNull, any>
     ? NotNull extends true
-      ? Type
-      : Type | undefined | null
+    ? Type
+    : Type | undefined | null
     : never;
 
 export type TableInsertArray<T extends TableDefinition<TableColumns>> = T['$inferInsert'][];
@@ -162,6 +174,9 @@ export type TableDefinition<TCols extends TableColumns, TOptions = TableOptions>
     // Phantom types for inference
     readonly $inferSelect: InferSelectModel<{ $columns: TCols }>;
     readonly $inferInsert: InferInsertModel<{ $columns: TCols }>;
+    // Clean aliases for DX
+    readonly $type: InferSelectModel<{ $columns: TCols }>;
+    readonly $insert: InferInsertModel<{ $columns: TCols }>;
 } & TCols;
 
 // Internal table shape for cleaner public signatures.
@@ -176,6 +191,9 @@ export type TableRuntime<TInsert = any, TSelect = any, TOptions = TableOptions> 
     // Phantom types for inference
     readonly $inferSelect: TSelect;
     readonly $inferInsert: TInsert;
+    // Clean aliases for DX
+    readonly $type: TSelect;
+    readonly $insert: TInsert;
 };
 
 export interface VersionedMeta {
@@ -401,15 +419,26 @@ export function chTable<T extends Record<string, ClickHouseColumn<any, any, any>
 
             let sql = `CREATE TABLE IF NOT EXISTS \`${tableName}\`${clusterClause} (${colDefs.join(', ')}) ENGINE = ${finalEngineSQL}`;
 
+            const mapColumnList = (val: string | string[] | undefined) => {
+                if (!val) return '';
+                const list = Array.isArray(val) ? val : val.split(',').map(v => v.trim());
+                return list.map(id => {
+                    const col = columns[id];
+                    if (col) return `\`${col.name}\``;
+                    // If it's already a column name or a function, return as is (wrapped in backticks if it looks like an identifier)
+                    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(id)) {
+                        return `\`${id}\``;
+                    }
+                    return id;
+                }).join(', ');
+            };
+
             if (finalOptions.orderBy) {
-                const orderBy = Array.isArray(finalOptions.orderBy) ? finalOptions.orderBy.join(', ') : finalOptions.orderBy;
+                const orderBy = mapColumnList(finalOptions.orderBy);
                 sql += ` ORDER BY (${orderBy})`;
             } else if (isMergeTreeFamilyEngine) {
-                // MergeTree family requires ORDER BY
-                // Default to tuple() if no PK/Order provided (technically valid but rarely desired)
-                // Or use Primary Key if available
                 if (finalOptions.primaryKey) {
-                    const pk = Array.isArray(finalOptions.primaryKey) ? finalOptions.primaryKey.join(', ') : finalOptions.primaryKey;
+                    const pk = mapColumnList(finalOptions.primaryKey);
                     sql += ` ORDER BY (${pk})`;
                 } else {
                     sql += ` ORDER BY tuple()`;
@@ -417,17 +446,17 @@ export function chTable<T extends Record<string, ClickHouseColumn<any, any, any>
             }
 
             if (finalOptions.primaryKey) {
-                const pk = Array.isArray(finalOptions.primaryKey) ? finalOptions.primaryKey.join(', ') : finalOptions.primaryKey;
+                const pk = mapColumnList(finalOptions.primaryKey);
                 sql += ` PRIMARY KEY (${pk})`;
             }
 
             if (finalOptions.partitionBy) {
-                const partition = Array.isArray(finalOptions.partitionBy) ? finalOptions.partitionBy.join(', ') : finalOptions.partitionBy;
+                const partition = mapColumnList(finalOptions.partitionBy);
                 sql += ` PARTITION BY (${partition})`;
             }
 
             if (finalOptions.sampleBy) {
-                const sample = Array.isArray(finalOptions.sampleBy) ? finalOptions.sampleBy.join(', ') : finalOptions.sampleBy;
+                const sample = mapColumnList(finalOptions.sampleBy);
                 sql += ` SAMPLE BY (${sample})`;
             }
 

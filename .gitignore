@@ -36,7 +36,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Temporary / Development Files
 all.txt
-reproduce_phase3.ts
 .housekit/
 
 # Note: scripts/, examples/, tests/, config files and .npmignore 
@@ -46,3 +45,4 @@ reproduce_phase3.ts
 CLAUDE.md
 .gemini
 cat.js
+all-diff.txt

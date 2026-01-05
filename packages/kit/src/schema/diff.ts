@@ -211,6 +211,19 @@ function extractHousekitMetadata(comment: string | null) {
     return null;
 }
 
+function mapColumnRefs(val: any, localCols: Record<string, ClickHouseColumn>): any {
+    if (!val) return val;
+    if (Array.isArray(val)) {
+        return val.map(v => localCols[v]?.name || v);
+    }
+    if (typeof val === 'string') {
+        const parts = val.split(',').map(p => p.trim());
+        const mapped = parts.map(p => localCols[p]?.name || p);
+        return mapped.length === 1 ? mapped[0] : mapped;
+    }
+    return val;
+}
+
 export function diffTable(
     table: any,
     localCols: Record<string, ClickHouseColumn>,
@@ -352,14 +365,16 @@ export function diffTable(
         warnings.push('Engine mismatch requires full table recreation');
     }
 
-    compare('orderBy', localOpts.orderBy, remoteOpts.orderBy, () => {
+    const mappedOrderBy = mapColumnRefs(localOpts.orderBy, localCols);
+    compare('orderBy', mappedOrderBy, remoteOpts.orderBy, () => {
         destructiveReasons.push('order by change');
-        plan.push(`ALTER TABLE \`${tableName}\` MODIFY ORDER BY (${normalizeClause(localOpts.orderBy)})`);
+        plan.push(`ALTER TABLE \`${tableName}\` MODIFY ORDER BY (${normalizeClause(mappedOrderBy)})`);
     });
 
-    compare('partitionBy', localOpts.partitionBy, remoteOpts.partitionBy, () => {
+    const mappedPartitionBy = mapColumnRefs(localOpts.partitionBy, localCols);
+    compare('partitionBy', mappedPartitionBy, remoteOpts.partitionBy, () => {
         destructiveReasons.push('partition change');
-        plan.push(`ALTER TABLE \`${tableName}\` MODIFY PARTITION BY (${normalizeClause(localOpts.partitionBy)})`);
+        plan.push(`ALTER TABLE \`${tableName}\` MODIFY PARTITION BY (${normalizeClause(mappedPartitionBy)})`);
     });
 
     compare('ttl', localOpts.ttl, remoteOpts.ttl, () => {
@@ -367,9 +382,10 @@ export function diffTable(
         plan.push(`ALTER TABLE \`${tableName}\` MODIFY TTL ${normalizeClause(localOpts.ttl)}`);
     });
 
-    compare('primaryKey', localOpts.primaryKey, remoteOpts.primaryKey, () => {
+    const mappedPrimaryKey = mapColumnRefs(localOpts.primaryKey, localCols);
+    compare('primaryKey', mappedPrimaryKey, remoteOpts.primaryKey, () => {
         destructiveReasons.push('primary key change');
-        plan.push(`ALTER TABLE \`${tableName}\` MODIFY PRIMARY KEY (${normalizeClause(localOpts.primaryKey)})`);
+        plan.push(`ALTER TABLE \`${tableName}\` MODIFY PRIMARY KEY (${normalizeClause(mappedPrimaryKey)})`);
     });
 
     const localIndexDefs = (localOpts.indices as IndexDefinition[] | undefined) ?? [];

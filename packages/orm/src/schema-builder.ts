@@ -92,6 +92,32 @@ export type EnhancedTableOptions<TColKeys extends string = string> = Omit<
  * ClickHouse data types builder.
  * All columns are NOT NULL by default, following ClickHouse philosophy.
  */
+function primaryUuid(): { id: ClickHouseColumn<string, true, true> };
+function primaryUuid<TName extends string>(name: TName): { [K in TName]: ClickHouseColumn<string, true, true> };
+function primaryUuid<TName extends string>(name?: TName) {
+    const colName = (name ?? 'id') as TName;
+    const column = new ClickHouseColumn<string>(colName, 'UUID')
+        .autoGenerate()
+        .primaryKey()
+        .default('generateUUIDv4()');
+    return {
+        [colName]: column
+    } as { [K in TName]: typeof column };
+}
+
+function primaryUuidV7(): { id: ClickHouseColumn<string, true, true> };
+function primaryUuidV7<TName extends string>(name: TName): { [K in TName]: ClickHouseColumn<string, true, true> };
+function primaryUuidV7<TName extends string>(name?: TName) {
+    const colName = (name ?? 'id') as TName;
+    const column = new ClickHouseColumn<string>(colName, 'UUID')
+        .autoGenerate({ version: 7 })
+        .primaryKey()
+        .default('generateUUIDv7()');
+    return {
+        [colName]: column
+    } as { [K in TName]: typeof column };
+}
+
 export const t = {
     // --- Integer Types ---
     int8: (name: string) => new ClickHouseColumn<number>(name, 'Int8'),
@@ -238,15 +264,11 @@ export const t = {
     /**
      * Adds a standard UUID primary key column (default: 'id').
      */
-    primaryUuid: <TName extends string = 'id'>(name?: TName) => {
-        const colName = (name ?? 'id') as TName;
-        return {
-            [colName]: new ClickHouseColumn<string>(colName, 'UUID')
-                .autoGenerate()
-                .primaryKey()
-                .default('generateUUIDv4()')
-        } as { [K in TName]: ClickHouseColumn<string> };
-    },
+    primaryUuid,
+    /**
+     * Adds a UUID v7 primary key column (default: 'id').
+     */
+    primaryUuidV7,
 
     /**
      * Adds 'is_deleted' and 'deleted_at' columns for soft deletes.

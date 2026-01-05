@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS `events` (`id` UUID DEFAULT generateUUIDv7(), `user_id` UUID, `type` String, `created_at` DateTime DEFAULT now()) ENGINE = MergeTree() ORDER BY (`created_at`) COMMENT '{"housekit":{"version":"1.2.0","appendOnly":true,"readOnly":false}}';
+
+CREATE TABLE IF NOT EXISTS `users` (`id` UUID DEFAULT generateUUIDv7(), `email` String, `role` Nullable(String), `password` String, `phone_number` String, `created_at` DateTime DEFAULT now(), `updated_at` DateTime DEFAULT now()) ENGINE = MergeTree() ORDER BY (`id`) COMMENT '{"housekit":{"version":"1.2.0","appendOnly":true,"readOnly":false}}';

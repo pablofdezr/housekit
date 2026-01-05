@@ -4,7 +4,7 @@ import { Readable } from 'stream';
 import http from 'http';
 import https from 'https';
 import { ClickHouseQueryBuilder } from './builders/select';
-import { ClickHouseInsertBuilder } from './builders/insert';
+import { ClickHouseInsertBuilder, type BinaryInsertConfig } from './builders/insert';
 import { ClickHouseDeleteBuilder } from './builders/delete';
 import { ClickHouseUpdateBuilder } from './builders/update';
 import { type TableDefinition, type TableRuntime, type CleanInsert } from './core';
@@ -98,6 +98,14 @@ export function createHousekitClient<TSchema extends Record<string, TableDefinit
         await client.query({ query: `DROP TABLE${clause} \`${tableName}\`` });
     };
 
+    // Build connection config for binary inserts
+    const binaryInsertConfig: BinaryInsertConfig = {
+        url: normalizedConfig.url?.toString() || 'http://localhost:8123',
+        username: normalizedConfig.username || 'default',
+        password: normalizedConfig.password || '',
+        database: normalizedConfig.database || 'default',
+    };
+
     const baseClient: HousekitClient<TSchema> = {
         rawClient: client as ClickHouseClient,
         select: <T extends Record<string, any> | TableDefinition<any> | undefined = undefined>(fieldsOrTable?: T) => {
@@ -113,7 +121,7 @@ export function createHousekitClient<TSchema extends Record<string, TableDefinit
             return builder.with(name, query);
         },
         insert: <TTable extends TableRuntime<any, any>>(table: TTable) =>
-            new ClickHouseInsertBuilder(client, table),
+            new ClickHouseInsertBuilder(client, table, binaryInsertConfig),
         insertMany: async <TTable extends TableRuntime<any, any>>(
             table: TTable,
             values: Array<CleanInsert<TTable>> | Iterable<CleanInsert<TTable>> | AsyncIterable<CleanInsert<TTable>>,

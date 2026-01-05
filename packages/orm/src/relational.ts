@@ -29,6 +29,8 @@ const operators = {
     not: cond.not,
     isNull: cond.isNull,
     isNotNull: cond.isNotNull,
+    asc: ops.asc,
+    desc: ops.desc,
 };
 
 type Operators = typeof operators;
@@ -112,6 +114,19 @@ export type RelationalFindOptions<TTable = any> = {
      * Number of records to skip from the primary table.
      */
     offset?: number;
+
+    /**
+     * Order by clause for sorting results.
+     * Can be a single order expression, an array, or a callback.
+     * 
+     * @example orderBy: desc(users.createdAt)
+     * @example orderBy: [desc(users.createdAt), asc(users.name)]
+     * @example orderBy: (columns, { desc, asc }) => [desc(columns.createdAt)]
+     */
+    orderBy?: OrderByValue | OrderByValue[] | ((
+        columns: TTable extends TableDefinition<infer TCols> ? TCols : any,
+        fns: { asc: typeof ops.asc; desc: typeof ops.desc }
+    ) => OrderByValue | OrderByValue[]);
     
     /** 
      * Nested relations to include in the result set.
@@ -134,6 +149,8 @@ export type RelationalFindOptions<TTable = any> = {
      */
     joinStrategy?: JoinStrategy;
 };
+
+type OrderByValue = { col: ClickHouseColumn | SQLExpression; dir: 'ASC' | 'DESC' };
 
 export type RelationalAPI<TSchema extends Record<string, TableDefinition<any>>> = {
     [K in keyof TSchema]: {
@@ -310,6 +327,18 @@ export function buildRelationalAPI<TSchema extends Record<string, TableDefinitio
                 // Apply primary table filters
                 if (opts?.where) {
                     builder = builder.where(typeof opts.where === 'function' ? opts.where(tableDef.$columns) : opts.where);
+                }
+
+                // Apply orderBy
+                if (opts?.orderBy) {
+                    const orderByFns = { asc: ops.asc, desc: ops.desc };
+                    const orderByValue = typeof opts.orderBy === 'function' 
+                        ? opts.orderBy(tableDef.$columns, orderByFns)
+                        : opts.orderBy;
+                    const orderByArray = Array.isArray(orderByValue) ? orderByValue : [orderByValue];
+                    for (const ob of orderByArray) {
+                        builder = builder.orderBy(ob.col, ob.dir);
+                    }
                 }
                 
                 // Standard pagination

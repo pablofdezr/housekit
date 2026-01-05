@@ -1,17 +1,13 @@
 import type { ClickHouseClient } from '@clickhouse/client';
 import { type TableRuntime, type CleanInsert, type CleanSelect } from '../core';
-import { buildInsertPlan, processRowWithPlan, processRowsStream, type InsertPlan } from '../utils/insert-processing';
+import { buildInsertPlan, processRowWithPlan, type InsertPlan } from '../utils/insert-processing';
 import { createBatchTransformStream, type BatchTransformOptions } from '../utils/batch-transform';
 import { SyncBinarySerializer } from '../utils/binary-worker-pool';
-import {
-    BinaryWriter,
-    createBinaryEncoder,
-    type BinaryEncoder,
-    type BinarySerializationConfig
-} from '../utils/binary-serializer';
 import { Readable, Transform } from 'stream';
 import { type BatchConfig, globalBatcher } from '../utils/background-batcher';
 import { v1 as uuidv1, v4 as uuidv4, v6 as uuidv6, v7 as uuidv7 } from 'uuid';
+import http from 'http';
+import https from 'https';
 
 // ============================================================================
 // Types
@@ -89,10 +85,21 @@ class BinaryTransform extends Transform {
 }
 
 // ============================================================================
+// Connection config for binary inserts
+// ============================================================================
+
+export interface BinaryInsertConfig {
+    url: string;
+    username: string;
+    password: string;
+    database: string;
+}
+
+// ============================================================================
 // Insert Builder
 // ============================================================================
 
-export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TReturn = void> {
+export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TReturn = any> {
     private _values: Array<CleanInsert<TTable>> | Iterable<CleanInsert<TTable>> | AsyncIterable<CleanInsert<TTable>> | Readable | null = null;
     private _async: boolean = true;  // DEFAULT: async_insert enabled for best performance
     private _waitForAsync: boolean = true;
@@ -101,11 +108,13 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
     private _batchSize: number = 1000;
     private _batchConfig: BatchConfig | null = null;
     private _forceJson: boolean = false;
-    private _returning: boolean = false;
+    private _returning: boolean = false; // DEFAULT: off for binary performance
+    private _isSingle: boolean = false;
 
     constructor(
         private client: ClickHouseClient,
-        private table: TTable
+        private table: TTable,
+        private connectionConfig?: BinaryInsertConfig
     ) {
         // Auto-manage async_insert based on table options (default: async for best performance)
         if (table.$options?.asyncInsert !== undefined) {
@@ -113,18 +122,28 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
         }
     }
 
-    values(value: CleanInsert<TTable> | Array<CleanInsert<TTable>> | Iterable<CleanInsert<TTable>> | AsyncIterable<CleanInsert<TTable>> | Readable) {
+    values(value: CleanInsert<TTable> | Array<CleanInsert<TTable>> | Iterable<CleanInsert<TTable>> | AsyncIterable<CleanInsert<TTable>> | Readable): ClickHouseInsertBuilder<TTable, TReturn> {
         this._values = value as any;
-        return this;
+        this._isSingle = !Array.isArray(value) && !isIterable(value) && !isAsyncIterable(value) && !((value as any) instanceof Readable);
+        return this as any;
     }
 
     /** @template [T = CleanInsert<TTable>] */
-    async insert(data: CleanInsert<TTable> | CleanInsert<TTable>[]) {
-        return this.values(data as any);
+    async insert(data: CleanInsert<TTable> | CleanInsert<TTable>[]): Promise<TReturn> {
+        return this.values(data as any).execute();
     }
 
     returning(): ClickHouseInsertBuilder<TTable, CleanSelect<TTable>[]> {
         this._returning = true;
+        return this as any;
+    }
+
+    /**
+     * Disable the default returning() behavior. 
+     * Useful when you don't need the inserted data back and want to avoid the overhead.
+     */
+    noReturning(): ClickHouseInsertBuilder<TTable, void> {
+        this._returning = false;
         return this as any;
     }
 
@@ -288,6 +307,9 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
                 },
             });
 
+            if (this._isSingle && resultRows.length > 0) {
+                return resultRows[0] as any;
+            }
             return resultRows as any;
         }
 
@@ -404,8 +426,14 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
 
     /**
      * Execute insert using RowBinary format (fastest)
+     * Uses direct HTTP request since the official client doesn't support RowBinary yet
      */
     private async executeBinaryInsert(plan: InsertPlan, tableName: string): Promise<void> {
+        // Check if we have connection config for binary inserts
+        if (!this.connectionConfig) {
+            throw new Error('❌ Binary format requires connection configuration. This is an internal error - please report it.');
+        }
+
         // Build column configuration for binary serializer
         const columns = plan.columns.map((col: any) => ({
             name: col.columnName,
@@ -414,37 +442,83 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
             propKey: col.propKey,
         }));
 
-        // Create binary transform stream
-        const binaryTransform = new BinaryTransform(columns, this._batchSize);
+        // Create binary serializer
+        const serializer = new SyncBinarySerializer(columns);
 
-        let sourceStream: Readable;
-
+        // Collect all rows and serialize them
+        const allRows: Record<string, any>[] = [];
+        
         if (this._values instanceof Readable) {
-            sourceStream = this._values;
+            // For streams, we need to collect all data first
+            for await (const chunk of this._values) {
+                allRows.push(chunk);
+            }
         } else {
-            // Convert values to processed rows
-            const processedRows = this.processRows(plan);
-            sourceStream = Readable.from(processedRows, { objectMode: true });
+            // Process rows (skip date transform for binary format)
+            for await (const row of this.processRows(plan, true)) {
+                allRows.push(row);
+            }
         }
 
-        // Pipe through binary transform
-        const binaryStream = sourceStream.pipe(binaryTransform);
+        if (allRows.length === 0) {
+            return;
+        }
 
-        await this.client.insert({
-            table: tableName,
-            values: binaryStream,
-            format: 'RowBinary' as any, // RowBinary is supported but not in the type definitions
-            clickhouse_settings: {
-                async_insert: this._async ? 1 : 0,
-                wait_for_async_insert: this._waitForAsync ? 1 : 0,
-            },
+        // Serialize all rows to binary
+        const binaryData = serializer.serialize(allRows);
+
+        const { url: baseUrl, username, password, database } = this.connectionConfig;
+
+        // Build the query URL
+        const url = new URL(baseUrl);
+        const queryParams = new URLSearchParams({
+            query: `INSERT INTO ${tableName} FORMAT RowBinary`,
+            database: database,
+        });
+        
+        if (this._async) {
+            queryParams.set('async_insert', '1');
+            queryParams.set('wait_for_async_insert', this._waitForAsync ? '1' : '0');
+        }
+
+        url.search = queryParams.toString();
+
+        // Make HTTP request
+        const isHttps = url.protocol === 'https:';
+        const httpModule = isHttps ? https : http;
+
+        // Build auth header
+        const authHeader = Buffer.from(`${username}:${password}`).toString('base64');
+
+        return new Promise((resolve, reject) => {
+            const req = httpModule.request(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'Authorization': `Basic ${authHeader}`,
+                },
+            }, (res) => {
+                let body = '';
+                res.on('data', (chunk) => { body += chunk; });
+                res.on('end', () => {
+                    if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                        resolve();
+                    } else {
+                        reject(new Error(`ClickHouse error (${res.statusCode}): ${body}`));
+                    }
+                });
+            });
+
+            req.on('error', reject);
+            req.write(binaryData);
+            req.end();
         });
     }
 
     /**
      * Process rows and yield them with column names mapped and defaults applied
      */
-    private async *processRows(plan: InsertPlan): AsyncGenerator<Record<string, any>> {
+    private async *processRows(plan: InsertPlan, skipDateTransform: boolean = false): AsyncGenerator<Record<string, any>> {
         const values = this._values as any;
         const iterable = Array.isArray(values) ? values :
             isIterable(values) ? values :
@@ -470,8 +544,8 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
                     }
                 }
 
-                // Apply column transform
-                if (value !== undefined) {
+                // Apply column transform (skip for binary format to preserve Date objects)
+                if (value !== undefined && !skipDateTransform) {
                     value = col.transform(value);
                 }
 

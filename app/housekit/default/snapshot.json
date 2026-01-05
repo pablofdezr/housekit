@@ -1,0 +1,43 @@
+{
+  "events": {
+    "columns": {
+      "id": {
+        "type": "UUID DEFAULT generateUUIDv7()"
+      },
+      "userId": {
+        "type": "UUID"
+      },
+      "type": {
+        "type": "String"
+      },
+      "createdAt": {
+        "type": "DateTime DEFAULT now()"
+      }
+    }
+  },
+  "users": {
+    "columns": {
+      "id": {
+        "type": "UUID DEFAULT generateUUIDv7()"
+      },
+      "email": {
+        "type": "String"
+      },
+      "role": {
+        "type": "Nullable(String)"
+      },
+      "password": {
+        "type": "String"
+      },
+      "phone_number": {
+        "type": "String"
+      },
+      "created_at": {
+        "type": "DateTime DEFAULT now()"
+      },
+      "updated_at": {
+        "type": "DateTime DEFAULT now()"
+      }
+    }
+  }
+}

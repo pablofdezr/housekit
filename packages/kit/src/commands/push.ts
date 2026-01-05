@@ -4,7 +4,8 @@ import { resolveDatabase } from '../db';
 import { loadConfig, loadSchema } from '../loader';
 import { detectSchemaDrift, TableAnalysis } from '../schema/analyzer';
 import { analyzeExplain } from '../schema/parser';
-import { confirmPrompt, error, info, quoteName, success, warn } from '../ui';
+import { confirmPrompt, error, info, quoteName, success, warn, title, box, bold } from '../ui';
+import chalk from 'chalk';
 import { getSchemaMapping } from '../config';
 
 export async function pushCommand(options: { database?: string; logExplain?: boolean; autoUpgradeMetadata?: boolean }) {
@@ -23,6 +24,10 @@ export async function pushCommand(options: { database?: string; logExplain?: boo
     };
 
     try {
+        title('HouseKit Push — Data Synchronizer');
+        info(`Schema: ${chalk.white.bold(schemaPath)}`);
+        info(`Target: ${chalk.white.bold(dbName)}\n`);
+
         const tables = await loadSchema(schemaPath, { quiet: true });
 
         const analyses = await detectSchemaDrift(client, tables, {
@@ -66,30 +71,46 @@ export async function pushCommand(options: { database?: string; logExplain?: boo
             }
 
             // type === 'modify'
+            const changeDescriptions: string[] = [];
             if (adds.length || modifies.length || drops.length || optionChanges.length) {
                 if (adds.length) {
-                    info(`  + ${quoteName(name)}: add`);
-                    adds.forEach(col => info(`    - ${quoteName(col)}`));
+                    changeDescriptions.push(chalk.green(`  + ${adds.length} addition(s)`));
+                    adds.forEach(col => changeDescriptions.push(`    ${chalk.gray('•')} ${quoteName(col)}`));
                 }
                 if (modifies.length) {
-                    info(`  ~ ${quoteName(name)}: modify`);
-                    modifies.forEach(col => info(`    - ${quoteName(col)}`));
+                    changeDescriptions.push(chalk.blue(`  ~ ${modifies.length} modification(s)`));
+                    modifies.forEach(col => changeDescriptions.push(`    ${chalk.gray('•')} ${quoteName(col)}`));
                 }
                 if (drops.length) {
-                    warn(`  - ${quoteName(name)}: drop`);
-                    drops.forEach(col => warn(`    - ${quoteName(col)}`));
+                    changeDescriptions.push(chalk.red(`  - ${drops.length} drop(s)`));
+                    drops.forEach(col => changeDescriptions.push(`    ${chalk.gray('•')} ${quoteName(col)}`));
                 }
                 if (optionChanges.length) {
-                    warn(`  * ${quoteName(name)}: ${optionChanges.join(', ')}`);
+                    changeDescriptions.push(chalk.magenta(`  * ${optionChanges.length} option change(s): ${optionChanges.join(', ')}`));
                 }
             }
 
-            warnings.forEach(w => warn(`  ! ${w}`));
-            if (destructiveReasons.length > 0) {
-                warn(`  ⚠ ${quoteName(name)}: ${destructiveReasons[0].includes('type change') ? 'type changes' : 'changes'}`);
-                destructiveReasons.forEach(reason => warn(`    - ${reason}`));
+            if (warnings.length > 0) {
+                warnings.forEach(w => changeDescriptions.push(chalk.yellow(`  ! ${w}`)));
+                anyWarnings = true;
             }
-            if (warnings.length > 0) anyWarnings = true;
+
+            if (destructiveReasons.length > 0) {
+                const header = destructiveReasons[0].includes('type change') ? 'Type Changes Required' : 'Schema Changes Detected';
+                changeDescriptions.push(chalk.yellow.bold(`\n  ⚠ ${header}:`));
+                destructiveReasons.forEach(reason => changeDescriptions.push(`    ${chalk.yellow('-')} ${reason}`));
+            }
+
+            if (changeDescriptions.length > 0) {
+                box([
+                    chalk.bold.white(`Table: ${quoteName(name)}`),
+                    '',
+                    ...changeDescriptions
+                ].join('\n'), {
+                    borderColor: destructiveReasons.length > 0 ? 'yellow' : 'cyan',
+                    padding: 0
+                });
+            }
 
             await dumpIfEnabled(plan, name);
 

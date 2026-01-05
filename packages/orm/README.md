@@ -58,8 +58,8 @@ export const webEvents = defineTable('web_events', {
 });
 
 // ✨ Export inferred types directly
-export type WebEvent = typeof webEvents.$inferSelect;
-export type NewWebEvent = typeof webEvents.$inferInsert;
+export type WebEvent = typeof webEvents.$type;
+export type NewWebEvent = typeof webEvents.$insert;
 ```
 
 ### 2. Connect and Query
@@ -120,6 +120,27 @@ export const users = defineTable('users', {
 });
 ```
 
+### Presets
+Use column presets to reduce boilerplate for common patterns.
+
+```typescript
+export const users = defineTable('users', {
+  id: t.uuid('id')
+    .autoGenerate({ version: 7 })
+    .primaryKey()
+    .default('generateUUIDv7()'),
+  email: t.string('email'),
+  role: t.enum('role', ['admin', 'user']),
+  ...t.timestamps(),
+}, {
+  engine: Engine.MergeTree(),
+  orderBy: 'id'
+});
+
+// Optional: use presets to shorten the ID definition
+// ...t.primaryUuidV7()
+```
+
 ### Dictionaries
 Map external data or internal tables to fast in-memory dictionaries for ultra-low latency lookups.
 
@@ -173,7 +194,7 @@ await builder.append(row2);
 
 ## 🛠️ Zero-Config Type Safety
 
-Because we use **Phantom Types**, you don't need to import generic helpers like `Infer<T>` in your application code. You can use `typeof table.$infer...` or the types you exported from your schema file.
+Because we use **Phantom Types**, you don't need to import generic helpers like `Infer<T>` in your application code. You can use `typeof table.$type` / `typeof table.$insert` or the types you exported from your schema file.
 
 ### In Repository Functions
 
@@ -188,12 +209,12 @@ async function logEvents(events: NewWebEvent[]) {
 
 ### Clean Tooltips (Auto-Prettify)
 
-`$inferSelect` and `$inferInsert` are automatically expanded into clean object shapes in editor tooltips.
+`$type` and `$insert` are automatically expanded into clean object shapes in editor tooltips.
 
 ```typescript
 import { priceEvents } from './schema';
 
-export type NewPriceEvent = typeof priceEvents.$inferInsert;
+export type NewPriceEvent = typeof priceEvents.$insert;
 
 // Hover "NewPriceEvent" and you'll see:
 // { id: string; venueId: string; supplierId: string; ... }

@@ -80,7 +80,7 @@ export class ClickHouseColumn<
      * Define a default value for the column. 
      * Can be a static value or a SQL expression like 'now()'.
      */
-    default(value: any) {
+    default(value: any): ClickHouseColumn<TType, TNotNull, true> {
         const meta: ColumnMeta = { ...(this.meta ?? {}) };
 
         // Detect if value is a SQL expression or a literal
@@ -102,7 +102,7 @@ export class ClickHouseColumn<
             meta.default = value;
             delete meta.defaultExpr;
         }
-        return this.clone({ meta });
+        return this.clone<TNotNull, true>({ meta });
     }
 
     references(
@@ -164,9 +164,9 @@ export class ClickHouseColumn<
      * Calculates the column value on the client side before insertion.
      * Useful for UUIDs, hashes, or computations based on other fields.
      */
-    $defaultFn(fn: (row: Record<string, any>) => any) {
+    $defaultFn(fn: (row: Record<string, any>) => any): ClickHouseColumn<TType, TNotNull, true> {
         const meta: ColumnMeta = { ...(this.meta ?? {}), defaultFn: fn };
-        return this.clone({ meta });
+        return this.clone<TNotNull, true>({ meta });
     }
 
     toSQL() {

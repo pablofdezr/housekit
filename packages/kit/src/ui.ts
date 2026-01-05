@@ -1,6 +1,8 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
+import boxen from 'boxen';
+import gradient from 'gradient-string';
 
 const prefix = chalk.gray('[housekit]');
 
@@ -22,6 +24,24 @@ export function success(message: string) {
 
 export function error(message: string) {
     console.error(format(chalk.red(message)));
+}
+
+export function bold(message: string) {
+    return chalk.bold(message);
+}
+
+export function box(message: string, options: any = {}) {
+    console.log(boxen(message, {
+        padding: 1,
+        margin: 1,
+        borderStyle: 'round',
+        borderColor: 'cyan',
+        ...options
+    }));
+}
+
+export function title(message: string) {
+    console.log('\n' + chalk.bold(gradient(['cyan', 'blue'])(message)));
 }
 
 export function createSpinner(message: string) {
@@ -61,17 +81,17 @@ export async function listPrompt<T = string>(
     if (globalYes && defaultValue !== undefined) {
         return defaultValue;
     }
-    
+
     if (choices.length === 0) {
         throw new Error('No choices provided to listPrompt');
     }
-    
+
     // According to inquirer docs: default must be the index or value of one of the entries
     // Using index is more reliable when using objects with name/value
-    const defaultIndex = defaultValue !== undefined 
+    const defaultIndex = defaultValue !== undefined
         ? choices.findIndex(c => c.value === defaultValue)
         : 0;
-    
+
     // Use rawlist instead of list - it shows options as numbered list which is more visible
     // rawlist returns the index (1-based) when using objects with name/value
     const result = await inquirer.prompt<{ value: number | T }>([{
@@ -83,7 +103,7 @@ export async function listPrompt<T = string>(
         pageSize: Math.min(choices.length, 10),
         loop: true
     }]);
-    
+
     // Handle the result - could be index (number) or value (T) depending on inquirer version
     let finalValue: T;
     if (typeof result.value === 'number') {
@@ -94,7 +114,7 @@ export async function listPrompt<T = string>(
         // Already the value
         finalValue = result.value as T;
     }
-    
+
     return finalValue;
 }
 
@@ -127,13 +147,13 @@ export async function checkboxPrompt<T = string>(
     if (globalYes && defaultSelected !== undefined) {
         return defaultSelected;
     }
-    
+
     if (choices.length === 0) {
         throw new Error('No choices provided to checkboxPrompt');
     }
-    
+
     const defaultValues = defaultSelected || [];
-    
+
     const result = await inquirer.prompt<{ value: T[] }>([{
         type: 'checkbox',
         name: 'value',
@@ -143,7 +163,7 @@ export async function checkboxPrompt<T = string>(
         pageSize: Math.min(choices.length, 10),
         loop: true
     }]);
-    
+
     return result.value;
 }
 
@@ -169,30 +189,30 @@ export function quoteValue(value: string | undefined, defaultType?: string): str
     if (!value && (!defaultType || defaultType === '')) return '—';
     if (!value && defaultType) return quoteName(defaultType);
     if (!value) return '—';
-    
+
     const trimmed = value.trim();
-    
+
     // If already quoted with single quotes (from CREATE TABLE), keep as is but show with double quotes for consistency
     if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
         // Extract the inner value and quote it with double quotes
         const innerValue = trimmed.slice(1, -1);
         return quoteName(innerValue);
     }
-    
+
     // If already quoted with double quotes, keep as is
     if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
         return trimmed;
     }
-    
+
     // If it's a SQL expression (contains parentheses, functions, etc.), don't quote
-    const isExpression = 
+    const isExpression =
         trimmed.includes('(') && trimmed.includes(')') ||
         trimmed.match(/^[a-zA-Z_][a-zA-Z0-9_]*\s*\(/);
-    
+
     if (isExpression) {
         return trimmed;
     }
-    
+
     // It's a literal value (number, unquoted string, etc.), quote it
     return quoteName(trimmed);
 }
