@@ -96,32 +96,59 @@ export type RelationalResult<TTable, TWith = undefined> = Simplify<
         : {})
 >;
 
+// Type for object where syntax: { email: 'value' } or { email: 'value', role: 'admin' }
+type WhereObject<TTable> = TTable extends TableDefinition<infer TCols>
+    ? { [K in keyof TCols]?: TCols[K] extends ClickHouseColumn<infer T> ? T | SQLExpression : any }
+    : Record<string, any>;
+
 export type RelationalFindOptions<TTable = any> = {
     /** 
-     * Filter conditions for the main query.
-     * Can be a SQL expression or a callback receiving the table columns.
+     * Filter rows.
      * 
-     * @example where: (users) => eq(users.active, true)
+     * @example
+     * // Object syntax (simplest)
+     * where: { email: 'a@b.com' }
+     * where: { role: 'admin', active: true }
+     * 
+     * // Direct expression
+     * where: eq(users.active, true)
+     * 
+     * // Callback for complex filters
+     * where: (cols, { eq, and, gt }) => and(eq(cols.role, 'admin'), gt(cols.age, 18))
      */
-    where?: SQLExpression | ((columns: TTable extends TableDefinition<infer TCols> ? TCols : any) => SQLExpression);
+    where?: WhereObject<TTable> | SQLExpression | ((
+        columns: TTable extends TableDefinition<infer TCols> ? TCols : any,
+        ops: typeof operators
+    ) => SQLExpression);
     
-    /** 
-     * Maximum number of records to return from the primary table.
-     */
+    /** Max rows to return */
     limit?: number;
-    
+
     /** 
-     * Number of records to skip from the primary table.
+     * Select specific columns. By default all columns are returned.
+     * 
+     * @example
+     * columns: { id: true, email: true }
      */
+    columns?: TTable extends TableDefinition<infer TCols> 
+        ? { [K in keyof TCols]?: boolean }
+        : Record<string, boolean>;
+    
+    /** Rows to skip */
     offset?: number;
 
     /**
-     * Order by clause for sorting results.
-     * Can be a single order expression, an array, or a callback.
+     * Sort results. Accepts direct value, array, or callback.
      * 
-     * @example orderBy: desc(users.createdAt)
-     * @example orderBy: [desc(users.createdAt), asc(users.name)]
-     * @example orderBy: (columns, { desc, asc }) => [desc(columns.createdAt)]
+     * @example
+     * // Direct
+     * orderBy: desc(users.createdAt)
+     * 
+     * // Array
+     * orderBy: [desc(users.createdAt), asc(users.name)]
+     * 
+     * // Callback
+     * orderBy: (cols, { desc }) => desc(cols.createdAt)
      */
     orderBy?: OrderByValue | OrderByValue[] | ((
         columns: TTable extends TableDefinition<infer TCols> ? TCols : any,
@@ -129,22 +156,19 @@ export type RelationalFindOptions<TTable = any> = {
     ) => OrderByValue | OrderByValue[]);
     
     /** 
-     * Nested relations to include in the result set.
-     * Set to `true` for all columns or provide a `RelationalFindOptions` object for nested filtering/limiting.
+     * Include related data. Use `true` for all columns or an object for filtering.
      * 
-     * @example with: { posts: { limit: 5 }, profile: true }
+     * @example
+     * with: { 
+     *   posts: true,                          // All posts
+     *   comments: { limit: 5 },               // Latest 5 comments
+     *   profile: { where: eq(profile.public, true) }  // Only public profile
+     * }
      */
     with?: RelationalWith<TTable>;
     
     /**
-     * Join strategy for related data.
-     * 
-     * - 'auto': Automatically uses GLOBAL when table has onCluster option.
-     * - 'standard': Regular LEFT JOIN.
-     * - 'global': Force GLOBAL JOIN (for sharded clusters).
-     * - 'any': Use ANY JOIN (faster, optimized for 1:1 relations).
-     * - 'global_any': Combine GLOBAL and ANY.
-     * 
+     * Join strategy for distributed clusters.
      * @default 'auto'
      */
     joinStrategy?: JoinStrategy;
@@ -152,12 +176,31 @@ export type RelationalFindOptions<TTable = any> = {
 
 type OrderByValue = { col: ClickHouseColumn | SQLExpression; dir: 'ASC' | 'DESC' };
 
+// Helper type for columns selection result
+type SelectedColumns<TTable, TCols> = TCols extends Record<string, boolean>
+    ? { [K in keyof TCols as TCols[K] extends true ? K : never]: K extends keyof CleanSelect<TTable> ? CleanSelect<TTable>[K] : never }
+    : CleanSelect<TTable>;
+
 export type RelationalAPI<TSchema extends Record<string, TableDefinition<any>>> = {
     [K in keyof TSchema]: {
+        /** Find multiple records with optional filtering, pagination, and relations */
         findMany: <TOpts extends RelationalFindOptions<TSchema[K]> | undefined>(
             opts?: TOpts
         ) => Promise<Array<RelationalResult<TSchema[K], TOpts extends RelationalFindOptions<TSchema[K]> ? TOpts['with'] : undefined>>>;
+        
+        /** Find a single record (first match) */
         findFirst: <TOpts extends RelationalFindOptions<TSchema[K]> | undefined>(
+            opts?: TOpts
+        ) => Promise<RelationalResult<TSchema[K], TOpts extends RelationalFindOptions<TSchema[K]> ? TOpts['with'] : undefined> | null>;
+
+        /** 
+         * Find a record by its primary key
+         * @example
+         * const user = await db.query.users.findById('uuid-here')
+         * const user = await db.query.users.findById('uuid', { with: { posts: true } })
+         */
+        findById: <TOpts extends Omit<RelationalFindOptions<TSchema[K]>, 'where' | 'limit'> | undefined>(
+            id: string | number,
             opts?: TOpts
         ) => Promise<RelationalResult<TSchema[K], TOpts extends RelationalFindOptions<TSchema[K]> ? TOpts['with'] : undefined> | null>;
     }
@@ -214,7 +257,13 @@ export function buildRelationalAPI<TSchema extends Record<string, TableDefinitio
              */
             findMany: async (opts?: RelationalFindOptions<typeof tableDef>) => {
                 let builder = new ClickHouseQueryBuilder(client).from(tableDef);
-                const baseColumns = Object.entries(tableDef.$columns);
+                
+                // Filter columns if specified
+                const selectedColumns = opts?.columns;
+                const baseColumns = selectedColumns
+                    ? Object.entries(tableDef.$columns).filter(([key]) => selectedColumns[key] === true)
+                    : Object.entries(tableDef.$columns);
+                
                 const relations = (tableDef as any).$relations as Record<string, RelationDefinition> | undefined;
 
                 // Identify top-level relations requested by the user
@@ -227,7 +276,8 @@ export function buildRelationalAPI<TSchema extends Record<string, TableDefinitio
                     .filter((r): r is { relName: string; rel: RelationDefinition; options: RelationalFindOptions } => Boolean(r.rel));
 
                 const needsGrouping = requestedRelations.length > 0;
-                const groupByColumns = needsGrouping ? baseColumns.map(([, col]) => col as ClickHouseColumn) : [];
+                const allColumns = Object.entries(tableDef.$columns); // For groupBy we need all columns
+                const groupByColumns = needsGrouping ? allColumns.map(([, col]) => col as ClickHouseColumn) : [];
 
                 // Detect environmental requirements
                 const joinStrategy: JoinStrategy = opts?.joinStrategy || 'auto';
@@ -244,14 +294,17 @@ export function buildRelationalAPI<TSchema extends Record<string, TableDefinitio
                     prefix: string = '',
                     outerJoinStrategy: JoinStrategy,
                     outerUseGlobal: boolean,
-                    outerUseAny: boolean
+                    outerUseAny: boolean,
+                    columnsFilter?: Record<string, boolean | undefined>
                 ): { selection: Record<string, any>; joins: any[] } {
                     let currentSelection: Record<string, any> = {};
                     let currentJoins: any[] = [];
 
-                    // Register columns for the current table level
+                    // Register columns for the current table level (filtered if specified)
                     Object.entries(currentTableDef.$columns).forEach(([key, col]) => {
-                        currentSelection[`${prefix}${key}`] = col;
+                        if (!columnsFilter || columnsFilter[key] === true) {
+                            currentSelection[`${prefix}${key}`] = col;
+                        }
                     });
 
                     if (!currentWith) return { selection: currentSelection, joins: currentJoins };
@@ -266,9 +319,23 @@ export function buildRelationalAPI<TSchema extends Record<string, TableDefinitio
 
                     for (const { relName, rel, options } of requestedNested) {
                         const newPrefix = prefix ? `${prefix}_${relName}_` : `${relName}_`;
-                        const relWhere = options.where
-                            ? (typeof options.where === 'function' ? options.where(rel.table.$columns) : options.where)
-                            : null;
+                        
+                        // Process where: function, object, or SQLExpression
+                        let relWhere: SQLExpression | null = null;
+                        if (options.where) {
+                            if (typeof options.where === 'function') {
+                                relWhere = options.where(rel.table.$columns, operators);
+                            } else if (typeof options.where === 'object' && !('toSQL' in options.where)) {
+                                const conditions = Object.entries(options.where).map(([key, value]) => {
+                                    const col = rel.table.$columns[key] as ClickHouseColumn;
+                                    if (!col) throw new Error(`Column '${key}' not found in relation '${relName}'`);
+                                    return ops.eq(col, value);
+                                });
+                                relWhere = conditions.length === 1 ? conditions[0] : cond.and(...conditions)!;
+                            } else {
+                                relWhere = options.where as SQLExpression;
+                            }
+                        }
 
                         let joinCondition = buildJoinCondition(rel.fields, rel.references);
 
@@ -301,7 +368,7 @@ export function buildRelationalAPI<TSchema extends Record<string, TableDefinitio
                         }
 
                         // Recursively process deeper levels of the relation tree
-                        const nestedResult = buildNestedSelection(rel.table, options.with, newPrefix, outerJoinStrategy, outerUseGlobal, outerUseAny);
+                        const nestedResult = buildNestedSelection(rel.table, options.with, newPrefix, outerJoinStrategy, outerUseGlobal, outerUseAny, options.columns);
                         if (!(rel.relation === 'many' && !prefix)) {
                             Object.assign(currentSelection, nestedResult.selection);
                         }
@@ -310,7 +377,7 @@ export function buildRelationalAPI<TSchema extends Record<string, TableDefinitio
                     return { selection: currentSelection, joins: currentJoins };
                 }
 
-                const { selection: flatSelection, joins: allJoins } = buildNestedSelection(tableDef, opts?.with, '', joinStrategy, useGlobal, useAny);
+                const { selection: flatSelection, joins: allJoins } = buildNestedSelection(tableDef, opts?.with, '', joinStrategy, useGlobal, useAny, opts?.columns);
 
                 // Initialize standard Select Query
                 for (const joinDef of allJoins) {
@@ -326,7 +393,21 @@ export function buildRelationalAPI<TSchema extends Record<string, TableDefinitio
                 
                 // Apply primary table filters
                 if (opts?.where) {
-                    builder = builder.where(typeof opts.where === 'function' ? opts.where(tableDef.$columns) : opts.where);
+                    let whereValue: SQLExpression;
+                    if (typeof opts.where === 'function') {
+                        whereValue = opts.where(tableDef.$columns, operators);
+                    } else if (opts.where && typeof opts.where === 'object' && !('toSQL' in opts.where)) {
+                        // Object syntax: { email: 'value', role: 'admin' }
+                        const conditions = Object.entries(opts.where).map(([key, value]) => {
+                            const col = tableDef.$columns[key] as ClickHouseColumn;
+                            if (!col) throw new Error(`Column '${key}' not found in table`);
+                            return ops.eq(col, value);
+                        });
+                        whereValue = conditions.length === 1 ? conditions[0] : cond.and(...conditions)!;
+                    } else {
+                        whereValue = opts.where as SQLExpression;
+                    }
+                    builder = builder.where(whereValue);
                 }
 
                 // Apply orderBy
@@ -451,6 +532,32 @@ export function buildRelationalAPI<TSchema extends Record<string, TableDefinitio
              */
             findFirst: async (opts?: RelationalFindOptions) => {
                 const rows = await api[tableKey].findMany({ ...opts, limit: 1 });
+                return rows[0] ?? null;
+            },
+
+            /**
+             * Find a record by its primary key.
+             * Automatically detects the primary key column from table options.
+             */
+            findById: async (id: string | number, opts?: Omit<RelationalFindOptions, 'where' | 'limit'>) => {
+                // Get primary key column(s) from table options
+                const pkOption = (tableDef.$options as any)?.primaryKey;
+                const pkCols = pkOption 
+                    ? (Array.isArray(pkOption) ? pkOption : [pkOption])
+                    : [Object.keys(tableDef.$columns)[0]]; // Default to first column
+                
+                const pkColName = pkCols[0];
+                const pkColumn = tableDef.$columns[pkColName] as ClickHouseColumn;
+                
+                if (!pkColumn) {
+                    throw new Error(`Primary key column '${pkColName}' not found in table '${tableKey}'`);
+                }
+
+                const rows = await api[tableKey].findMany({
+                    ...opts,
+                    where: ops.eq(pkColumn, id),
+                    limit: 1
+                });
                 return rows[0] ?? null;
             }
         };

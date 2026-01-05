@@ -14,10 +14,10 @@ HouseKit ORM is a modern database toolkit designed specifically for ClickHouse. 
 ## 🚀 Key Features
 
 - **🛡️ First-Class TypeScript**: Full type inference for every query. Schema definition acts as the single source of truth.
-- **🏎️ Automatic Turbo Mode**: Native `RowBinary` serialization is used automatically when possible. Bypasses the overhead of JSON parsing for **5-10x faster inserts**.
+- **🏎️ Binary Inserts by Default**: Native `RowBinary` serialization is used automatically. **5-10x faster** than JSON.
 - **🏗️ ClickHouse Native Engines**: Fluent DSL for `MergeTree`, `ReplacingMergeTree`, `SummingMergeTree`, `Distributed`, `Buffer`, and more.
 - **🔍 Advanced Analytics**: Specialized support for `ASOF JOIN`, `ARRAY JOIN`, `PREWHERE`, and complex Window Functions.
-- **🤝 Smart Relational API**: Query relations using `groupArray` internally, preventing row duplication and keeping data transfer lean.
+- **🤝 Smart Relational API**: Query relations using `groupArray` internally, preventing row duplication.
 - **📦 Background Batching**: Built-in buffering to collect small inserts into high-performance batches automatically.
 
 ---
@@ -25,9 +25,6 @@ HouseKit ORM is a modern database toolkit designed specifically for ClickHouse. 
 ## 📦 Installation
 
 ```bash
-# HouseKit requires the official ClickHouse client as a peer dependency
-npm install @housekit/orm @clickhouse/client
-# or
 bun add @housekit/orm @clickhouse/client
 ```
 
@@ -35,100 +32,14 @@ bun add @housekit/orm @clickhouse/client
 
 ## ⚡️ Quick Start
 
-### 1. Define your Table & Export Types
-Use the fluent `defineTable` API. You can export the inferred types directly from the schema definition thanks to **Phantom Types**.
+### 1. Define your Table
 
 ```typescript
 // schema.ts
-import { defineTable, t, Engine } from '@housekit/orm';
+import { defineTable, t, Engine, relations } from '@housekit/orm';
 
-export const webEvents = defineTable('web_events', {
-  id: t.uuid('id').primaryKey(),
-  eventType: t.string('event_type'),
-  url: t.string('url'),
-  revenue: t.decimal('revenue', 18, 4).default(0),
-  tags: t.array(t.string('tag')),
-  metadata: t.json('metadata'),
-  at: t.datetime('at').default('now()'),
-}, {
-  engine: Engine.MergeTree(),
-  orderBy: 'at',
-  partitionBy: 'toYYYYMM(at)',
-  ttl: 'at + INTERVAL 1 MONTH'
-});
-
-// ✨ Export inferred types directly
-export type WebEvent = typeof webEvents.$type;
-export type NewWebEvent = typeof webEvents.$insert;
-```
-
-### 2. Connect and Query
-HouseKit automatically picks up configuration from your environment or `housekit.config.ts`.
-
-```typescript
-import { createClient, sql } from '@housekit/orm';
-import { webEvents } from './schema';
-
-const db = await createClient();
-
-// Fully typed result inference.
-// No need to call .then() or .execute(), just await the builder!
-const results = await db.select({
-    id: webEvents.id,
-    path: webEvents.url,
-    total: sql<number>`sum(${webEvents.revenue})`
-  })
-  .from(webEvents)
-  .where({
-    // Object syntax implicitly uses AND operator
-    eventType: 'sale',
-    url: '/checkout'
-  })
-  .groupBy(webEvents.id, webEvents.url)
-  .limit(10);
-```
-
----
-
-## 🧠 Advanced Schema Definitions
-
-### Complex Engines
-HouseKit supports specialized ClickHouse engines with strict type checking for their parameters.
-
-```typescript
-// SummingMergeTree: Automatically aggregates numeric columns
-export const dailyRevenue = defineTable('daily_revenue', {
-  day: t.date('day'),
-  revenue: t.float64('revenue'),
-}, {
-  engine: Engine.SummingMergeTree(['revenue']),
-  orderBy: 'day'
-});
-
-// ReplacingMergeTree: Deduplicates data by version
 export const users = defineTable('users', {
-  id: t.uint64('id'),
-  email: t.string('email'),
-  version: t.uint64('version'),
-}, {
-  engine: Engine.ReplacingMergeTree('version'),
-  
-  // Portability: '{cluster}' references the server-side macro.
-  onCluster: '{cluster}', 
-  
-  orderBy: 'id'
-});
-```
-
-### Presets
-Use column presets to reduce boilerplate for common patterns.
-
-```typescript
-export const users = defineTable('users', {
-  id: t.uuid('id')
-    .autoGenerate({ version: 7 })
-    .primaryKey()
-    .default('generateUUIDv7()'),
+  id: t.uuid('id').autoGenerate({ version: 7 }).primaryKey().default('generateUUIDv7()'),
   email: t.string('email'),
   role: t.enum('role', ['admin', 'user']),
   ...t.timestamps(),
@@ -137,12 +48,197 @@ export const users = defineTable('users', {
   orderBy: 'id'
 });
 
-// Optional: use presets to shorten the ID definition
-// ...t.primaryUuidV7()
+export const posts = defineTable('posts', {
+  id: t.uuid('id').autoGenerate({ version: 7 }).primaryKey().default('generateUUIDv7()'),
+  userId: t.uuid('user_id'),
+  title: t.string('title'),
+  createdAt: t.timestamp('created_at').default('now()'),
+}, {
+  engine: Engine.MergeTree(),
+  orderBy: 'createdAt'
+});
+
+relations(users, ({ many }) => ({
+  posts: many(posts, { fields: [users.id], references: [posts.userId] })
+}));
+
+export type User = typeof users.$type;
+export type NewUser = typeof users.$insert;
+```
+
+### 2. Connect and Query
+
+```typescript
+import { housekit } from '@housekit/orm';
+import * as schema from './schema';
+
+const db = housekit({ url: 'http://localhost:8123' }, { schema });
+
+// Binary insert (default, fastest)
+await db.insert(schema.users).values({ email: 'a@b.com', role: 'admin' });
+
+// JSON insert with returning data
+const [user] = await db
+  .insert(schema.users)
+  .values({ email: 'a@b.com', role: 'admin' })
+  .returning();
+```
+
+---
+
+## 🔍 Relational Query API
+
+### findMany / findFirst
+
+```typescript
+const users = await db.query.users.findMany({
+  where: { role: 'admin', active: true },
+  columns: { id: true, email: true },
+  orderBy: (cols, { desc }) => desc(cols.createdAt),
+  limit: 10,
+  with: {
+    posts: { limit: 5 }
+  }
+});
+```
+
+### findById
+
+```typescript
+// Simple lookup
+const user = await db.query.users.findById('uuid-here');
+
+// With relations
+const user = await db.query.users.findById('uuid-here', {
+  with: { posts: true }
+});
+```
+
+### where syntax
+
+```typescript
+// Object syntax (simplest)
+where: { email: 'a@b.com' }
+where: { role: 'admin', active: true }  // AND implícito
+
+// Direct expression
+where: eq(users.role, 'admin')
+
+// Callback for complex filters
+where: (cols, { and, gt, inArray }) => and(
+  gt(cols.age, 18),
+  inArray(cols.role, ['admin', 'moderator'])
+)
+```
+
+Available operators: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `inArray`, `notInArray`, `between`, `notBetween`, `has`, `hasAll`, `hasAny`, `and`, `or`, `not`, `isNull`, `isNotNull`
+
+### columns selection
+
+Select specific columns:
+
+```typescript
+const users = await db.query.users.findMany({
+  columns: { id: true, email: true }
+});
+// Returns: [{ id: '...', email: '...' }]
+```
+
+### orderBy
+
+```typescript
+// Callback (recommended)
+orderBy: (cols, { desc }) => desc(cols.createdAt)
+
+// Multiple columns
+orderBy: (cols, { desc, asc }) => [desc(cols.createdAt), asc(cols.name)]
+
+// Direct value
+orderBy: desc(users.createdAt)
+
+// Array
+orderBy: [desc(users.createdAt), asc(users.name)]
+```
+
+---
+
+## 🚀 High-Performance Inserts
+
+### Binary Insert (Default)
+
+Binary format is used by default for maximum performance:
+
+```typescript
+// Binary insert (no data returned)
+await db.insert(events).values([
+  { type: 'click', userId: '...' },
+  { type: 'view', userId: '...' },
+]);
+```
+
+### JSON Insert with Returning
+
+Use `.returning()` when you need the inserted data back:
+
+```typescript
+const [user] = await db
+  .insert(users)
+  .values({ email: 'a@b.com', role: 'admin' })
+  .returning();
+
+console.log(user.id); // Generated UUID
+```
+
+### Force JSON Format
+
+```typescript
+await db.insert(events).values(data).useJsonFormat();
+```
+
+### Background Batching
+
+Collect small writes into efficient batches:
+
+```typescript
+const builder = db.insert(events).batch({ 
+  maxRows: 10000, 
+  flushIntervalMs: 5000 
+});
+
+// Fire-and-forget
+await builder.append(event1);
+await builder.append(event2);
+```
+
+---
+
+## 🧠 Advanced Schema
+
+### Complex Engines
+
+```typescript
+// SummingMergeTree
+export const dailyRevenue = defineTable('daily_revenue', {
+  day: t.date('day'),
+  revenue: t.float64('revenue'),
+}, {
+  engine: Engine.SummingMergeTree(['revenue']),
+  orderBy: 'day'
+});
+
+// ReplacingMergeTree
+export const users = defineTable('users', {
+  id: t.uint64('id'),
+  email: t.string('email'),
+  version: t.uint64('version'),
+}, {
+  engine: Engine.ReplacingMergeTree('version'),
+  onCluster: '{cluster}',
+  orderBy: 'id'
+});
 ```
 
 ### Dictionaries
-Map external data or internal tables to fast in-memory dictionaries for ultra-low latency lookups.
 
 ```typescript
 import { defineDictionary } from '@housekit/orm';
@@ -159,103 +255,30 @@ export const userCache = defineDictionary('user_dict', {
 
 ---
 
-## 🚀 High-Performance Data Ingestion
+## 🔍 Specialized Joins
 
-### Automatic Turbo Mode (RowBinary)
-When you call `db.insert()`, HouseKit analyzes your schema. If types are compatible, it automatically switches to **Turbo Mode**, using native binary serialization instead of JSON.
+### ASOF JOIN
 
 ```typescript
-// Clean syntax: No .execute() needed. Just await.
-await db.insert(webEvents).values([
-  { id: '...', eventType: 'click', revenue: 0, metadata: { browser: 'chrome' } },
-  { id: '...', eventType: 'purchase', revenue: 99.90, metadata: { browser: 'safari' } },
-]);
-// Logic: Object -> Buffer (Binary) -> ClickHouse Stream (Zero-copy)
+const matched = await db.select()
+  .from(trades)
+  .asofJoin(quotes, sql`${trades.symbol} = ${quotes.symbol} AND ${trades.at} >= ${quotes.at}`)
+  .limit(100);
 ```
 
-### Background Batching
-Collect small, frequent writes into large batches to prevent the "too many parts" error in ClickHouse.
+### GLOBAL JOIN
 
 ```typescript
-const builder = db.insert(webEvents)
-  .batch({ 
-    maxRows: 10000, 
-    flushIntervalMs: 5000 
-  });
-
-// Add rows to the background queue.
-// Processing and flushing happen automatically.
-// Returns immediately (Fire-and-forget).
-await builder.append(row1);
-await builder.append(row2);
-```
-
----
-
-## 🛠️ Zero-Config Type Safety
-
-Because we use **Phantom Types**, you don't need to import generic helpers like `Infer<T>` in your application code. You can use `typeof table.$type` / `typeof table.$insert` or the types you exported from your schema file.
-
-### In Repository Functions
-
-```typescript
-import { webEvents, type NewWebEvent } from './schema';
-
-async function logEvents(events: NewWebEvent[]) {
-  // Types match automatically
-  return await db.insert(webEvents).values(events);
-}
-```
-
-### Clean Tooltips (Auto-Prettify)
-
-`$type` and `$insert` are automatically expanded into clean object shapes in editor tooltips.
-
-```typescript
-import { priceEvents } from './schema';
-
-export type NewPriceEvent = typeof priceEvents.$insert;
-
-// Hover "NewPriceEvent" and you'll see:
-// { id: string; venueId: string; supplierId: string; ... }
-```
-
----
-
-## 🤝 Smart Relational API
-
-Traditional ORMs produce "Flat Joins" that duplicate data (the Cartesian Product problem). HouseKit's Relational API uses ClickHouse's `groupArray` internally to fetch related data as nested arrays in a single, efficient query.
-
-```typescript
-// Define relations in your schema first
-import { relations } from '@housekit/orm';
-
-relations(users, ({ many }) => ({
-  posts: many(posts, { fields: [users.id], references: [posts.userId] })
-}));
-
-// Query with nested data
-const usersWithData = await db.query.users.findMany({
-  where: { country: 'US' }, // Object syntax
-  with: {
-    posts: {
-      limit: 5,
-      orderBy: { col: posts.createdAt, dir: 'DESC' }
-    }
-  },
-  limit: 10
-});
-
-// Result structure:
-// [{ id: 1, name: 'Alice', posts: [{ title: '...', ... }] }]
+await db.select()
+  .from(distributedTable)
+  .globalJoin(rightTable, condition);
 ```
 
 ---
 
 ## 🛠 SQL Utilities
 
-### Dynamic Queries with `sql.join`
-Easily build complex queries by joining SQL fragments with separators.
+### Dynamic Queries
 
 ```typescript
 const conditions = [
@@ -270,32 +293,7 @@ const query = await db.select()
 
 ---
 
-## 🔍 Specialized ClickHouse Joins
-
-### ASOF JOIN
-The industry standard for time-series matches (e.g., matching a trade with the closest price quote).
-
-```typescript
-const matched = await db.select()
-  .from(trades)
-  .asofJoin(quotes, sql`${trades.symbol} = ${quotes.symbol} AND ${trades.at} >= ${quotes.at}`)
-  .limit(100);
-```
-
-### GLOBAL JOIN
-Essential for distributed setups to avoid local-data-only results on sharded clusters.
-
-```typescript
-await db.select()
-  .from(distributedTable)
-  .globalJoin(rightTable, condition);
-```
-
----
-
-## 🛠 Observability & Logging
-
-Inject a custom logger to monitor query performance, throughput, and error rates.
+## 🛠 Observability
 
 ```typescript
 const db = await createClient({

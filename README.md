@@ -14,12 +14,12 @@ HouseKit is a monorepo consisting of two core components:
 
 ### [1. @housekit/orm](./packages/orm)
 The high-performance core.
-- **Turbo Mode**: Native `RowBinary` serialization for 5-10x faster inserts than JSON.
+- **Turbo Mode**: Native `RowBinary` serialization for 5-10x faster inserts than JSON (default).
 - **Type-Safe DSL**: Fully typed query builder and schema definition.
 - **Relational API**: Optimized one-to-many and one-to-one fetching using ClickHouse's `groupArray`.
 - **Background Batching**: Use `.batch()` and `.append(row)` for ultra-low latency, high-throughput writes.
-- **Zero-Config Types**: Phantom types with clean tooltips via `$inferSelect`/`$inferInsert`.
-- **Object WHERE**: `{ id: 1, active: true }` syntax across select/update/delete.
+- **Zero-Config Types**: Phantom types with clean tooltips via `$type`/`$insert`.
+- **Modern DX**: Simplified `where`, `orderBy`, and `columns` syntax.
 
 ### [2. housekit (CLI)](./packages/kit)
 The schema management and migration tool.
@@ -35,7 +35,7 @@ The schema management and migration tool.
 | Feature | Why it matters |
 | :--- | :--- |
 | **Modern DX** | Focus on building your app, not fighting with SQL strings or clunky ORMs. |
-| **Performance First** | Automatic binary serialization (RowBinary) bypasses heavy JSON parsing on the server. |
+| **Performance First** | Binary serialization (RowBinary) by default—bypasses heavy JSON parsing. |
 | **Zero Dependencies** | Powered by `jiti` for native TS loading—no `ts-node` or heavy build steps required. |
 | **Blue-Green Migrations** | Safe, zero-downtime structural changes for Materialized Views and Tables. |
 | **Production Ready** | Designed for modern workflows with ESM-first architecture and full type inference. |
@@ -43,8 +43,6 @@ The schema management and migration tool.
 ---
 
 ## 🛠 Quick Start
-
-If you want to start managing your ClickHouse schema with HouseKit:
 
 ```bash
 # 1. Install the CLI and ORM
@@ -68,8 +66,20 @@ import * as schema from './schema';
 
 const db = housekit({ url: 'http://localhost:8123' }, { schema });
 
-const user = await db.select(schema.users).where({ id: 'user_1' }).findFirst();
+// Relational queries with simplified syntax
+const user = await db.query.users.findFirst({
+  where: { email: 'a@b.com' },
+  columns: { id: true, email: true },
+  with: { posts: { limit: 5 } }
+});
 
+// Find by ID shorthand
+const userById = await db.query.users.findById('uuid-here');
+
+// Binary insert (default, fastest)
+await db.insert(schema.users).values({ email: 'a@b.com', role: 'admin' });
+
+// JSON insert with returning data
 const [created] = await db
   .insert(schema.users)
   .values({ email: 'a@b.com', role: 'admin' })
@@ -86,8 +96,8 @@ export const users = defineTable('users', {
   role: t.enum('role', ['admin', 'user']),
 }, { engine: Engine.MergeTree(), orderBy: 'id' });
 
-export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
+export type User = typeof users.$type;
+export type NewUser = typeof users.$insert;
 ```
 
 ---
@@ -97,6 +107,7 @@ export type NewUser = typeof users.$inferInsert;
 Detailed documentation for each component can be found in their respective directories:
 - [ORM Core Documentation & API Reference](./packages/orm/README.md)
 - [CLI Commands & Workflow Guide](./packages/kit/README.md)
+- [Demo App](./app/README.md)
 
 ---
 
