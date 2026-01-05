@@ -18,6 +18,8 @@ The high-performance core.
 - **Type-Safe DSL**: Fully typed query builder and schema definition.
 - **Relational API**: Optimized one-to-many and one-to-one fetching using ClickHouse's `groupArray`.
 - **Background Batching**: Use `.batch()` and `.append(row)` for ultra-low latency, high-throughput writes.
+- **Zero-Config Types**: Phantom types with clean tooltips via `$inferSelect`/`$inferInsert`.
+- **Object WHERE**: `{ id: 1, active: true }` syntax across select/update/delete.
 
 ### [2. housekit (CLI)](./packages/kit)
 The schema management and migration tool.
@@ -54,6 +56,38 @@ bunx housekit init
 # 3. Define your first table in src/schema/index.ts
 # (Then sync it to the DB)
 bunx housekit push
+```
+
+---
+
+## ✨ ORM DX Highlights
+
+```typescript
+import { housekit } from '@housekit/orm';
+import * as schema from './schema';
+
+const db = housekit({ url: 'http://localhost:8123' }, { schema });
+
+const user = await db.select(schema.users).where({ id: 'user_1' }).findFirst();
+
+const [created] = await db
+  .insert(schema.users)
+  .values({ email: 'a@b.com', role: 'admin' })
+  .returning();
+```
+
+```typescript
+// schema.ts
+import { defineTable, t, Engine } from '@housekit/orm';
+
+export const users = defineTable('users', {
+  id: t.uuid('id').primaryKey(),
+  email: t.string('email'),
+  role: t.enum('role', ['admin', 'user']),
+}, { engine: Engine.MergeTree(), orderBy: 'id' });
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 ```
 
 ---

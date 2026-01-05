@@ -186,6 +186,19 @@ async function logEvents(events: NewWebEvent[]) {
 }
 ```
 
+### Clean Tooltips (Auto-Prettify)
+
+`$inferSelect` and `$inferInsert` are automatically expanded into clean object shapes in editor tooltips.
+
+```typescript
+import { priceEvents } from './schema';
+
+export type NewPriceEvent = typeof priceEvents.$inferInsert;
+
+// Hover "NewPriceEvent" and you'll see:
+// { id: string; venueId: string; supplierId: string; ... }
+```
+
 ---
 
 ## 🤝 Smart Relational API
