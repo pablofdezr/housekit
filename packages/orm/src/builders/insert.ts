@@ -3,86 +3,45 @@ import { type TableRuntime, type CleanInsert, type CleanSelect } from '../core';
 import { buildInsertPlan, processRowWithPlan, type InsertPlan } from '../utils/insert-processing';
 import { createBatchTransformStream, type BatchTransformOptions } from '../utils/batch-transform';
 import { SyncBinarySerializer } from '../utils/binary-worker-pool';
-import { Readable, Transform } from 'stream';
+import { Readable } from 'stream';
 import { type BatchConfig, globalBatcher } from '../utils/background-batcher';
-import { v1 as uuidv1, v4 as uuidv4, v6 as uuidv6, v7 as uuidv7 } from 'uuid';
 import http from 'http';
 import https from 'https';
+
+// Lazy-load uuid only when needed (reduces startup time)
+let uuidv4Fn: (() => string) | null = null;
+let uuidv7Fn: (() => string) | null = null;
+let uuidv1: (() => string) | null = null;
+let uuidv6: (() => string) | null = null;
+
+// Use native crypto.randomUUID when available (Node 19+, Bun, modern browsers)
+const hasNativeUUID = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function';
+
+function getUUIDv4(): string {
+    // Prefer native implementation (faster, no dependencies)
+    if (hasNativeUUID) {
+        return crypto.randomUUID();
+    }
+    if (uuidv4Fn) return uuidv4Fn();
+    // Sync fallback - load uuid package
+    const uuid = require('uuid');
+    uuidv4Fn = uuid.v4;
+    return uuidv4Fn!();
+}
+
+function getUUIDv7(): string {
+    if (uuidv7Fn) return uuidv7Fn();
+    // Sync fallback - load uuid package
+    const uuid = require('uuid');
+    uuidv7Fn = uuid.v7;
+    return uuidv7Fn!();
+}
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/**
- * Insert format strategy:
- * - 'auto': Automatically choose best format (default - uses binary when possible)
- * - 'binary': Force RowBinary format (fastest)
- * - 'json': Force JSON format (for debugging/compatibility)
- * - 'compact': Force JSONCompactEachRow (smaller than JSON, faster than JSON)
- */
 type InsertFormat = 'auto' | 'binary' | 'json' | 'compact';
-
-export interface InsertOptions {
-    /** 
-     * Format strategy for serialization.
-     * Default: 'auto' (uses RowBinary when possible, falls back to JSON)
-     */
-    format?: InsertFormat;
-    /** Rows per batch when streaming */
-    batchSize?: number;
-}
-
-// ============================================================================
-// Binary Stream Transform
-// ============================================================================
-
-/**
- * Transform that converts objects to RowBinary format
- */
-class BinaryTransform extends Transform {
-    private serializer: SyncBinarySerializer;
-    private batch: any[] = [];
-    private batchSize: number;
-
-    constructor(
-        columns: Array<{ name: string; type: string; isNullable: boolean }>,
-        batchSize: number = 1000
-    ) {
-        super({ objectMode: true, writableObjectMode: true, readableObjectMode: false });
-        this.serializer = new SyncBinarySerializer(columns);
-        this.batchSize = batchSize;
-    }
-
-    _transform(row: any, _encoding: string, callback: (error?: Error | null) => void): void {
-        this.batch.push(row);
-
-        if (this.batch.length >= this.batchSize) {
-            try {
-                const buffer = this.serializer.serialize(this.batch);
-                this.push(buffer);
-                this.batch = [];
-            } catch (error) {
-                callback(error as Error);
-                return;
-            }
-        }
-
-        callback();
-    }
-
-    _flush(callback: (error?: Error | null) => void): void {
-        if (this.batch.length > 0) {
-            try {
-                const buffer = this.serializer.serialize(this.batch);
-                this.push(buffer);
-            } catch (error) {
-                callback(error as Error);
-                return;
-            }
-        }
-        callback();
-    }
-}
 
 // ============================================================================
 // Connection config for binary inserts
@@ -93,6 +52,8 @@ export interface BinaryInsertConfig {
     username: string;
     password: string;
     database: string;
+    /** Skip validation for maximum performance */
+    skipValidation?: boolean;
 }
 
 // ============================================================================
@@ -105,11 +66,11 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
     private _waitForAsync: boolean = true;
     private _batchOptions: BatchTransformOptions = {};
     private _format: InsertFormat = 'auto'; // DEFAULT: auto (prefers binary)
-    private _batchSize: number = 1000;
     private _batchConfig: BatchConfig | null = null;
     private _forceJson: boolean = false;
     private _returning: boolean = false; // DEFAULT: off for binary performance
     private _isSingle: boolean = false;
+    private _skipValidation: boolean = false;
 
     constructor(
         private client: ClickHouseClient,
@@ -120,6 +81,19 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
         if (table.$options?.asyncInsert !== undefined) {
             this._async = table.$options.asyncInsert;
         }
+        // Inherit skipValidation from connection config
+        if (connectionConfig?.skipValidation) {
+            this._skipValidation = true;
+        }
+    }
+
+    /**
+     * Skip enum validation for maximum performance.
+     * Use in production when you trust your data source.
+     */
+    skipValidation(): this {
+        this._skipValidation = true;
+        return this;
     }
 
     values(value: CleanInsert<TTable> | Array<CleanInsert<TTable>> | Iterable<CleanInsert<TTable>> | AsyncIterable<CleanInsert<TTable>> | Readable): ClickHouseInsertBuilder<TTable, TReturn> {
@@ -139,7 +113,7 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
     }
 
     /**
-     * Disable the default returning() behavior. 
+     * Disable the default returning() behavior.
      * Useful when you don't need the inserted data back and want to avoid the overhead.
      */
     noReturning(): ClickHouseInsertBuilder<TTable, void> {
@@ -198,7 +172,7 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
      * Default: 1000
      */
     batchSize(size: number) {
-        this._batchSize = size;
+        this._batchOptions.batchSize = size;
         return this;
     }
 
@@ -216,7 +190,7 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
             this.batch();
         }
 
-        const plan = buildInsertPlan(this.table);
+        const plan = buildInsertPlan(this.table, { skipValidation: this._skipValidation });
         const batcher = globalBatcher(this.client);
 
         // We temporarily set _values to this single row to reuse processRows logic
@@ -287,7 +261,7 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
             throw new Error("❌ No values to insert");
         }
 
-        const plan = buildInsertPlan(this.table);
+        const plan = buildInsertPlan(this.table, { skipValidation: this._skipValidation });
 
         if (this._returning) {
             if (this._batchConfig) {
@@ -537,8 +511,8 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
                     if (col.defaultFn) {
                         value = col.defaultFn(row);
                     } else if (col.autoUUIDVersion !== null && !col.useServerUUID) {
-                        // Generate UUID using statically imported functions
-                        value = col.autoUUIDVersion === 7 ? uuidv7() : uuidv4();
+                        // Generate UUID using lazy-loaded functions
+                        value = col.autoUUIDVersion === 7 ? getUUIDv7() : getUUIDv4();
                     } else if (col.hasDefault) {
                         value = col.defaultValue;
                     }
@@ -616,10 +590,10 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
         if (normalized === 'now()' || normalized === 'now64()' || normalized.startsWith('now64(')) {
             return new Date();
         }
-        if (normalized === 'generateuuidv4()') return uuidv4();
-        if (normalized === 'generateuuidv7()') return uuidv7();
-        if (normalized === 'generateuuidv1()') return uuidv1();
-        if (normalized === 'generateuuidv6()') return uuidv6();
+        if (normalized === 'generateuuidv4()') return getUUIDv4();
+        if (normalized === 'generateuuidv7()') return getUUIDv7();
+        if (normalized === 'generateuuidv1()') return uuidv1?.() ?? getUUIDv4();
+        if (normalized === 'generateuuidv6()') return uuidv6?.() ?? getUUIDv7();
         return undefined;
     }
 

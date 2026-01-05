@@ -13,7 +13,55 @@ import { buildInsertPlan, processRowsStream } from './utils/insert-processing';
 import { wrapClientWithLogger, type HousekitLogger } from './logger';
 import { buildRelationalAPI, type RelationalAPI } from './relational';
 
-export type HousekitClientConfig = ClickHouseClientConfigOptions & { schema?: Record<string, TableDefinition<any>>; logger?: HousekitLogger };
+// ============================================================================
+// Optimization #3: Connection Pool Management
+// ============================================================================
+
+interface ConnectionPoolConfig {
+    /** Maximum concurrent sockets (default: 100) */
+    maxSockets?: number;
+    /** Keep connections alive (default: true) */
+    keepAlive?: boolean;
+    /** Keep-alive initial delay in ms (default: 1000) */
+    keepAliveInitialDelay?: number;
+    /** Socket timeout in ms (default: 30000) */
+    timeout?: number;
+}
+
+// Global agent pool for reuse across clients
+const agentPool = new Map<string, http.Agent | https.Agent>();
+
+function getOrCreateAgent(url: string, config: ConnectionPoolConfig = {}): http.Agent | https.Agent {
+    const isHttps = url.startsWith('https');
+    const key = `${url}-${config.maxSockets ?? 100}`;
+    
+    let agent = agentPool.get(key);
+    if (agent) return agent;
+    
+    const agentConfig = {
+        keepAlive: config.keepAlive ?? true,
+        keepAliveMsecs: config.keepAliveInitialDelay ?? 1000,
+        maxSockets: config.maxSockets ?? 100,
+        maxFreeSockets: Math.floor((config.maxSockets ?? 100) / 2),
+        timeout: config.timeout ?? 30000,
+    };
+    
+    agent = isHttps 
+        ? new https.Agent(agentConfig)
+        : new http.Agent(agentConfig);
+    
+    agentPool.set(key, agent);
+    return agent;
+}
+
+export type HousekitClientConfig = ClickHouseClientConfigOptions & { 
+    schema?: Record<string, TableDefinition<any>>; 
+    logger?: HousekitLogger;
+    /** Connection pool configuration */
+    pool?: ConnectionPoolConfig;
+    /** Skip validation for maximum insert performance */
+    skipValidation?: boolean;
+};
 export type ClientConfigWithSchema = HousekitClientConfig;
 
 export interface HousekitClient<TSchema extends Record<string, TableDefinition<any>> | undefined = any> {
@@ -44,7 +92,7 @@ export interface HousekitClient<TSchema extends Record<string, TableDefinition<a
 export function createHousekitClient<TSchema extends Record<string, TableDefinition<any>> | undefined = any>(
     config: HousekitClientConfig & { schema?: TSchema }
 ): HousekitClient<TSchema> {
-    const { schema, logger, ...configRest } = config;
+    const { schema, logger, pool, skipValidation, ...configRest } = config;
 
     // Normalize configuration
     const normalizedConfig: ClickHouseClientConfigOptions = { ...configRest };
@@ -59,10 +107,9 @@ export function createHousekitClient<TSchema extends Record<string, TableDefinit
     }
 
     const urlStr = normalizedConfig.url?.toString() ?? '';
-    const isHttps = urlStr.startsWith('https');
-    const keepAliveAgent = isHttps
-        ? new https.Agent({ keepAlive: true, maxSockets: 100 })
-        : new http.Agent({ keepAlive: true, maxSockets: 100 });
+    
+    // Use pooled connection agent (Optimization #3)
+    const keepAliveAgent = getOrCreateAgent(urlStr, pool);
 
     const clientConfig: ClickHouseClientConfigOptions = {
         ...normalizedConfig,
@@ -104,6 +151,7 @@ export function createHousekitClient<TSchema extends Record<string, TableDefinit
         username: normalizedConfig.username || 'default',
         password: normalizedConfig.password || '',
         database: normalizedConfig.database || 'default',
+        skipValidation,
     };
 
     const baseClient: HousekitClient<TSchema> = {

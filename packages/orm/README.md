@@ -293,6 +293,89 @@ const query = await db.select()
 
 ---
 
+## ⚡ Performance Optimizations
+
+HouseKit includes several optimizations for maximum throughput in production environments.
+
+### Connection Pooling
+
+Reuse HTTP connections across requests:
+
+```typescript
+const db = housekit({
+  url: 'http://localhost:8123',
+  pool: {
+    maxSockets: 200,      // Max concurrent connections
+    keepAlive: true,      // Reuse connections
+    timeout: 30000        // Socket timeout (ms)
+  }
+}, { schema });
+```
+
+### Skip Validation
+
+Bypass enum validation in production when you trust your data source:
+
+```typescript
+// Global (all inserts)
+const db = housekit({
+  url: 'http://localhost:8123',
+  skipValidation: true
+}, { schema });
+
+// Per-insert
+await db.insert(events).values(data).skipValidation();
+```
+
+### Object Pooling
+
+HouseKit automatically pools `BinaryWriter` instances to reduce GC pressure. For advanced use cases:
+
+```typescript
+import { acquireWriter, releaseWriter } from '@housekit/orm';
+
+const writer = acquireWriter();
+try {
+  // Use writer for custom serialization
+} finally {
+  releaseWriter(writer);
+}
+```
+
+### Optimized Serialization
+
+For maximum performance with large batches:
+
+```typescript
+import { 
+  buildOptimizedBinaryConfig, 
+  serializeRowsOptimized 
+} from '@housekit/orm';
+
+// Pre-compile accessors once
+const config = buildOptimizedBinaryConfig(columns, { 
+  skipValidation: true 
+});
+
+// Serialize batches with pooled writer + pre-compiled accessors
+const buffer = serializeRowsOptimized(rows, config);
+```
+
+### TypedArray for Numeric Data
+
+For schemas with mostly numeric columns:
+
+```typescript
+import { isNumericHeavySchema, serializeNumericBatch } from '@housekit/orm';
+
+if (isNumericHeavySchema(columns)) {
+  // Uses Float64Array for better memory layout
+  const { numericBuffer, otherData } = serializeNumericBatch(rows, config, numericIndices);
+}
+```
+
+---
+
 ## 🛠 Observability
 
 ```typescript

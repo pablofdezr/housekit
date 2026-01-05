@@ -1,5 +1,20 @@
 import { ClickHouseColumn, type TableRuntime } from '../core';
-import { v1, v3, v4, v5, v6, v7 } from 'uuid';
+
+// Use native crypto.randomUUID when available (faster than uuid package)
+const hasNativeUUID = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function';
+let uuidFns: Record<number, () => string> | null = null;
+
+function loadUUIDFns() {
+    if (uuidFns) return uuidFns;
+    const uuid = require('uuid');
+    uuidFns = {
+        1: uuid.v1,
+        4: hasNativeUUID ? () => crypto.randomUUID() : uuid.v4,
+        6: uuid.v6,
+        7: uuid.v7,
+    };
+    return uuidFns;
+}
 
 type UUIDVersion = 1 | 3 | 4 | 5 | 6 | 7;
 
@@ -20,16 +35,23 @@ export type InsertPlan = {
     keyToColumn: Map<string, PreparedInsertColumn>;
     columnNames: string[];
     useCompact: boolean;
+    /** Skip enum validation for maximum performance */
+    skipValidation?: boolean;
 };
 
-export function buildInsertPlan(table: TableRuntime<any, any>): InsertPlan {
+export interface InsertPlanOptions {
+    /** Skip enum validation in production for better performance */
+    skipValidation?: boolean;
+}
+
+export function buildInsertPlan(table: TableRuntime<any, any>, options?: InsertPlanOptions): InsertPlan {
     const columns: PreparedInsertColumn[] = [];
     const keyToColumn = new Map<string, PreparedInsertColumn>();
 
     for (const [propKey, colRaw] of Object.entries(table.$columns)) {
         const column = colRaw as ClickHouseColumn;
         const columnName = column.name;
-        const transform = createTransform(column);
+        const transform = createTransform(column, options?.skipValidation);
         const autoUUIDVersion = column.meta?.autoGenerate?.type === 'uuid'
             ? normalizeUUIDVersion(column.meta.autoGenerate.version)
             : null;
@@ -53,7 +75,7 @@ export function buildInsertPlan(table: TableRuntime<any, any>): InsertPlan {
     const columnNames = columns.map(c => c.columnName);
     const useCompact = columns.every(c => !c.useServerUUID);
 
-    return { columns, keyToColumn, columnNames, useCompact };
+    return { columns, keyToColumn, columnNames, useCompact, skipValidation: options?.skipValidation };
 }
 
 export function processRowWithPlan(
@@ -106,10 +128,10 @@ export async function* processRowsStream(
     }
 }
 
-function createTransform(col: ClickHouseColumn) {
+function createTransform(col: ClickHouseColumn, skipValidation?: boolean) {
     const hasJson = Boolean(col.meta?.isJson);
     const enumValues = col.meta?.enumValues;
-    const enumSet = enumValues ? new Set(enumValues) : null;
+    const enumSet = (!skipValidation && enumValues) ? new Set(enumValues) : null;
     const needsJson = hasJson;
     const needsEnum = Boolean(enumSet);
 
@@ -155,22 +177,22 @@ function normalizeUUIDVersion(version: any): UUIDVersion {
 }
 
 function generateUUID(version: UUIDVersion): string {
-    switch (version) {
-        case 1:
-            return v1();
-        case 3:
-            throw new Error('UUID v3 requires a name and namespace. Use v4, v6, or v7 for auto-generation.');
-        case 4:
-            return v4();
-        case 5:
-            throw new Error('UUID v5 requires a name and namespace. Use v4, v6, or v7 for auto-generation.');
-        case 6:
-            return v6();
-        case 7:
-            return v7();
-        default:
-            return v4();
+    // Fast path for v4 using native crypto
+    if (version === 4 && hasNativeUUID) {
+        return crypto.randomUUID();
     }
+    
+    const fns = loadUUIDFns();
+    const fn = fns[version];
+    
+    if (!fn) {
+        if (version === 3 || version === 5) {
+            throw new Error(`UUID v${version} requires a name and namespace. Use v4, v6, or v7 for auto-generation.`);
+        }
+        return fns[4](); // Default to v4
+    }
+    
+    return fn();
 }
 
 function processRowCompact(row: Record<string, any>, plan: InsertPlan) {

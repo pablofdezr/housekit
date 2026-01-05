@@ -1,4 +1,54 @@
-import { v4 as uuidv4 } from 'uuid';
+// Use native crypto.randomUUID when available (faster than uuid package)
+const hasNativeUUID = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function';
+let uuidv4Fn: (() => string) | null = null;
+
+function generateUUIDv4(): string {
+    if (hasNativeUUID) return crypto.randomUUID();
+    if (uuidv4Fn) return uuidv4Fn();
+    const uuid = require('uuid');
+    uuidv4Fn = uuid.v4;
+    return uuidv4Fn!();
+}
+
+// ============================================================================
+// Object Pool for BinaryWriter (Optimization #1)
+// ============================================================================
+
+const WRITER_POOL_SIZE = 8;
+const writerPool: BinaryWriter[] = [];
+let poolInitialized = false;
+
+function initWriterPool(): void {
+    if (poolInitialized) return;
+    for (let i = 0; i < WRITER_POOL_SIZE; i++) {
+        writerPool.push(new BinaryWriter(64 * 1024)); // 64KB initial size
+    }
+    poolInitialized = true;
+}
+
+/**
+ * Acquire a BinaryWriter from the pool (or create new if pool empty)
+ */
+export function acquireWriter(): BinaryWriter {
+    initWriterPool();
+    const writer = writerPool.pop();
+    if (writer) {
+        writer.reset();
+        return writer;
+    }
+    return new BinaryWriter(64 * 1024);
+}
+
+/**
+ * Release a BinaryWriter back to the pool
+ */
+export function releaseWriter(writer: BinaryWriter): void {
+    if (writerPool.length < WRITER_POOL_SIZE) {
+        writer.reset();
+        writerPool.push(writer);
+    }
+    // If pool is full, let GC collect it
+}
 
 /**
  * HouseKit Binary Serializer - Ultra-Fast RowBinary Encoding
@@ -668,7 +718,7 @@ export function createBinaryEncoder(clickhouseType: string, isNullable: boolean 
         return (writer: BinaryWriter, value: any) => {
             if (value === undefined || value === null) {
                 // Auto-generate UUIDv4
-                baseEncoder(writer, uuidv4());
+                baseEncoder(writer, generateUUIDv4());
             } else {
                 baseEncoder(writer, value);
             }
@@ -801,4 +851,153 @@ export function serializeRowsBinary(
     }
 
     return writer.toBuffer();
+}
+
+// ============================================================================
+// Optimization #2: Pre-compiled Column Accessors
+// ============================================================================
+
+export type RowAccessor = (row: any) => any;
+
+/**
+ * Create an optimized accessor function for a column.
+ * Uses direct property access instead of dynamic lookup.
+ */
+export function createAccessor(propKey: string, columnName: string): RowAccessor {
+    // If propKey and columnName are the same, use simple accessor
+    if (propKey === columnName) {
+        return (row: any) => row[propKey];
+    }
+    // Otherwise check both
+    return (row: any) => {
+        const v = row[propKey];
+        return v !== undefined ? v : row[columnName];
+    };
+}
+
+/**
+ * Optimized serialization config with pre-compiled accessors
+ */
+export interface OptimizedBinaryConfig {
+    columns: Array<{
+        name: string;
+        type: string;
+        isNullable: boolean;
+    }>;
+    encoders: BinaryEncoder[];
+    accessors: RowAccessor[];
+    /** Skip validation for maximum performance (Optimization #4) */
+    skipValidation?: boolean;
+}
+
+/**
+ * Build an optimized binary config with pre-compiled accessors
+ */
+export function buildOptimizedBinaryConfig(
+    columns: Array<{ name: string; type: string; isNull: boolean; propKey: string }>,
+    options?: { skipValidation?: boolean }
+): OptimizedBinaryConfig {
+    const encoders: BinaryEncoder[] = [];
+    const accessors: RowAccessor[] = [];
+    const columnInfos: OptimizedBinaryConfig['columns'] = [];
+
+    for (const col of columns) {
+        encoders.push(createBinaryEncoder(col.type, col.isNull));
+        accessors.push(createAccessor(col.propKey, col.name));
+        columnInfos.push({
+            name: col.name,
+            type: col.type,
+            isNullable: col.isNull,
+        });
+    }
+
+    return { 
+        columns: columnInfos, 
+        encoders, 
+        accessors,
+        skipValidation: options?.skipValidation 
+    };
+}
+
+/**
+ * Ultra-fast serialization using pre-compiled accessors and pooled writer
+ */
+export function serializeRowsOptimized(
+    rows: Array<Record<string, any>>,
+    config: OptimizedBinaryConfig
+): Buffer {
+    const writer = acquireWriter();
+    
+    try {
+        const { encoders, accessors } = config;
+        const colCount = encoders.length;
+        
+        for (let r = 0; r < rows.length; r++) {
+            const row = rows[r];
+            for (let c = 0; c < colCount; c++) {
+                encoders[c](writer, accessors[c](row));
+            }
+        }
+        
+        return writer.toBuffer();
+    } finally {
+        releaseWriter(writer);
+    }
+}
+
+// ============================================================================
+// Optimization #5: TypedArray support for numeric-heavy schemas
+// ============================================================================
+
+/**
+ * Check if a schema is numeric-heavy (>50% numeric columns)
+ */
+export function isNumericHeavySchema(columns: Array<{ type: string }>): boolean {
+    const numericTypes = ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 
+                          'int64', 'uint64', 'float32', 'float64'];
+    let numericCount = 0;
+    for (const col of columns) {
+        const type = col.type.toLowerCase();
+        if (numericTypes.some(t => type === t || type.startsWith(t))) {
+            numericCount++;
+        }
+    }
+    return numericCount > columns.length / 2;
+}
+
+/**
+ * Batch serialize numeric columns using TypedArrays for better performance.
+ * Only use for schemas with mostly numeric columns.
+ */
+export function serializeNumericBatch(
+    rows: Array<Record<string, any>>,
+    config: OptimizedBinaryConfig,
+    numericIndices: number[] // indices of numeric columns
+): { numericBuffer: ArrayBuffer; otherData: any[][] } {
+    const rowCount = rows.length;
+    const numericCount = numericIndices.length;
+    
+    // Pre-allocate typed array for all numeric values
+    // Using Float64 as it can hold all numeric types without precision loss
+    const numericBuffer = new Float64Array(rowCount * numericCount);
+    const otherData: any[][] = [];
+    
+    for (let r = 0; r < rowCount; r++) {
+        const row = rows[r];
+        const otherRow: any[] = [];
+        let numIdx = 0;
+        
+        for (let c = 0; c < config.accessors.length; c++) {
+            const value = config.accessors[c](row);
+            if (numericIndices.includes(c)) {
+                numericBuffer[r * numericCount + numIdx] = Number(value) || 0;
+                numIdx++;
+            } else {
+                otherRow.push(value);
+            }
+        }
+        otherData.push(otherRow);
+    }
+    
+    return { numericBuffer: numericBuffer.buffer, otherData };
 }

@@ -81,8 +81,18 @@ export {
     serializeRowBinary,
     serializeRowsBinary,
     buildBinaryConfig,
+    // Optimization exports
+    acquireWriter,
+    releaseWriter,
+    createAccessor,
+    buildOptimizedBinaryConfig,
+    serializeRowsOptimized,
+    isNumericHeavySchema,
+    serializeNumericBatch,
     type BinaryEncoder,
     type BinarySerializationConfig,
+    type OptimizedBinaryConfig,
+    type RowAccessor,
 } from './utils/binary-serializer';
 
 export {

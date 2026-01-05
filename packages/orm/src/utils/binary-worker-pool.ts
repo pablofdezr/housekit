@@ -297,35 +297,41 @@ export async function shutdownDefaultBinaryPool(): Promise<void> {
 import {
     BinaryWriter,
     createBinaryEncoder,
+    acquireWriter,
+    releaseWriter,
     type BinaryEncoder
 } from './binary-serializer';
 
 /**
- * Synchronous fallback serializer for environments without Worker support
+ * Synchronous fallback serializer for environments without Worker support.
+ * Uses object pooling for BinaryWriter instances.
  */
 export class SyncBinarySerializer {
     private encoders: BinaryEncoder[] = [];
     private columns: ColumnConfig[] = [];
-    private writer: BinaryWriter;
 
     constructor(columns: ColumnConfig[]) {
         this.columns = columns;
         this.encoders = columns.map(col => createBinaryEncoder(col.type, col.isNullable));
-        this.writer = new BinaryWriter(1024 * 1024);
     }
 
     serialize(rows: Array<Record<string, any>>): Buffer {
-        this.writer.reset();
+        // Use pooled writer instead of creating new one
+        const writer = acquireWriter();
 
-        for (const row of rows) {
-            for (let i = 0; i < this.columns.length; i++) {
-                const col = this.columns[i];
-                const value = row[col.name];
-                this.encoders[i](this.writer, value);
+        try {
+            for (const row of rows) {
+                for (let i = 0; i < this.columns.length; i++) {
+                    const col = this.columns[i];
+                    const value = row[col.name];
+                    this.encoders[i](writer, value);
+                }
             }
-        }
 
-        return this.writer.toBuffer();
+            return writer.toBuffer();
+        } finally {
+            releaseWriter(writer);
+        }
     }
 
     async *serializeStream(
