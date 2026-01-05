@@ -21,7 +21,7 @@ HouseKit is a monorepo consisting of two core components:
 
 ### [1. @housekit/orm](./packages/orm)
 The high-performance core.
-- **Turbo Mode**: Native `RowBinary` serialization for 5-10x faster inserts than JSON (default).
+- **High-Performance Inserts**: Optimized streaming with sync insert and JSONCompact formats.
 - **Type-Safe DSL**: Fully typed query builder and schema definition.
 - **Relational API**: Optimized one-to-many and one-to-one fetching using ClickHouse's `groupArray`.
 - **Background Batching**: Use `.batch()` and `.append(row)` for ultra-low latency, high-throughput writes.
@@ -42,7 +42,7 @@ The schema management and migration tool.
 | Feature | Why it matters |
 | :--- | :--- |
 | **Modern DX** | Focus on building your app, not fighting with SQL strings or clunky ORMs. |
-| **Performance First** | Binary serialization (RowBinary) by default—bypasses heavy JSON parsing. |
+| **Performance First** | Optimized insert streaming with sync mode and JSONCompact format. |
 | **Zero Dependencies** | Powered by `jiti` for native TS loading—no `ts-node` or heavy build steps required. |
 | **Blue-Green Migrations** | Safe, zero-downtime structural changes for Materialized Views and Tables. |
 | **Production Ready** | Designed for modern workflows with ESM-first architecture and full type inference. |
@@ -83,7 +83,7 @@ const user = await db.query.users.findFirst({
 // Find by ID shorthand
 const userById = await db.query.users.findById('uuid-here');
 
-// Binary insert (default, fastest)
+// Standard insert (no data returned)
 await db.insert(schema.users).values({ email: 'a@b.com', role: 'admin' });
 
 // JSON insert with returning data

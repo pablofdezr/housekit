@@ -2,7 +2,7 @@ import type { ClickHouseClientConfigOptions } from '@clickhouse/client';
 import { resolve, join } from 'path';
 import { existsSync, readdirSync } from 'fs';
 import { type TableDefinition, type TableColumns } from './core';
-import { createClientFromConfigObject, createHousekitClient, type ClientConfigWithSchema, type HousekitClient as HousekitClientType } from './client';
+import { createClientFromConfigObject, createHousekitClient, type ClientConfigWithSchema, type HousekitClient as HousekitClientType, type HousekitClientConfig } from './client';
 import { generateSelectSchema, generateInsertSchema } from './codegen/zod';
 
 // Export core types and utilities explicitly
@@ -153,7 +153,7 @@ export async function createClientFromConfig(databaseName: string = 'default'): 
 }
 
 export function housekit<TSchema extends Record<string, TableDefinition<any>> = Record<string, TableDefinition<any>>>(
-    config: ClickHouseClientConfigOptions,
+    config: HousekitClientConfig,
     options?: { schema?: TSchema }
 ): HousekitClientType<TSchema> {
     return createHousekitClient({

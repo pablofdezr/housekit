@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun run src/index.ts",
+    "benchmark": "bun run src/benchmark.ts",
     "push": "bun ../packages/kit/src/index.ts push",
     "pull": "bun ../packages/kit/src/index.ts pull",
     "generate": "bun ../packages/kit/src/index.ts generate",

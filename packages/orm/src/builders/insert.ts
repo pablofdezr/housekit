@@ -65,7 +65,7 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
     private _async: boolean = true;  // DEFAULT: async_insert enabled for best performance
     private _waitForAsync: boolean = true;
     private _batchOptions: BatchTransformOptions = {};
-    private _format: InsertFormat = 'auto'; // DEFAULT: auto (prefers binary)
+    private _format: InsertFormat = 'auto'; // DEFAULT: auto (prefers json)
     private _batchConfig: BatchConfig | null = null;
     private _forceJson: boolean = false;
     private _returning: boolean = false; // DEFAULT: off for binary performance
@@ -334,15 +334,8 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
     }
 
     /**
-     * Resolve the actual format to use based on settings and table capabilities.
-     * 
-     * Binary is preferred when:
-     * - No columns require server-side UUID generation
-     * - All column types are supported by our binary encoder
-     * 
-     * Falls back to JSON when:
-     * - Columns use server-side defaults (e.g., generateUUIDv4())
-     * - Unsupported types are detected
+     * Resolve the actual format to use based on settings.
+     * Default is JSON (most reliable and well-optimized by the official client).
      */
     private resolveFormat(plan: InsertPlan): 'binary' | 'json' | 'compact' {
         // If user explicitly chose, respect that
@@ -350,38 +343,9 @@ export class ClickHouseInsertBuilder<TTable extends TableRuntime<any, any>, TRet
             return this._format;
         }
 
-        // Check if binary is safe to use
-        const canUseBinary = this.canUseBinaryFormat(plan);
-
-        return canUseBinary ? 'binary' : (plan.useCompact ? 'compact' : 'json');
-    }
-
-    /**
-     * Check if table and data are compatible with binary format
-     */
-    private canUseBinaryFormat(plan: InsertPlan): boolean {
-        for (const col of plan.columns) {
-            // Server-side UUID generation requires JSON format
-            if (col.useServerUUID) {
-                return false;
-            }
-
-            // Check for unsupported types
-            const type = col.column.type.toLowerCase();
-
-            // These complex types might need special handling
-            // For now, be conservative and use JSON for them
-            if (
-                type.includes('map(') ||       // Map types
-                type.includes('tuple(') ||     // Tuple types  
-                type.includes('nested(') ||    // Nested types
-                type.includes('lowcardinality(') // LowCardinality needs special handling
-            ) {
-                return false;
-            }
-        }
-
-        return true;
+        // Default to JSON - the official client has excellent optimizations
+        // Use compact if the plan supports it (slightly smaller payload)
+        return plan.useCompact ? 'compact' : 'json';
     }
 
     /**

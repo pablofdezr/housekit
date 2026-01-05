@@ -14,7 +14,7 @@ HouseKit ORM is a modern database toolkit designed specifically for ClickHouse. 
 ## 🚀 Key Features
 
 - **🛡️ First-Class TypeScript**: Full type inference for every query. Schema definition acts as the single source of truth.
-- **🏎️ Binary Inserts by Default**: Native `RowBinary` serialization is used automatically. **5-10x faster** than JSON.
+- **🏎️ High-Performance Inserts**: Optimized streaming with JSONCompact format and sync insert mode.
 - **🏗️ ClickHouse Native Engines**: Fluent DSL for `MergeTree`, `ReplacingMergeTree`, `SummingMergeTree`, `Distributed`, `Buffer`, and more.
 - **🔍 Advanced Analytics**: Specialized support for `ASOF JOIN`, `ARRAY JOIN`, `PREWHERE`, and complex Window Functions.
 - **🤝 Smart Relational API**: Query relations using `groupArray` internally, preventing row duplication.
@@ -74,7 +74,7 @@ import * as schema from './schema';
 
 const db = housekit({ url: 'http://localhost:8123' }, { schema });
 
-// Binary insert (default, fastest)
+// Standard insert (no data returned)
 await db.insert(schema.users).values({ email: 'a@b.com', role: 'admin' });
 
 // JSON insert with returning data
@@ -164,16 +164,30 @@ orderBy: [desc(users.createdAt), asc(users.name)]
 
 ## 🚀 High-Performance Inserts
 
-### Binary Insert (Default)
-
-Binary format is used by default for maximum performance:
+### Default Insert
 
 ```typescript
-// Binary insert (no data returned)
+// Standard insert (no data returned)
 await db.insert(events).values([
   { type: 'click', userId: '...' },
   { type: 'view', userId: '...' },
 ]);
+```
+
+### Sync Insert (Fastest for Small Batches)
+
+Use `.syncInsert()` for maximum speed with batches under 5k rows:
+
+```typescript
+await db.insert(events).values(data).syncInsert();
+```
+
+### JSONCompact Format
+
+Use `.useCompactFormat()` for better performance with larger batches:
+
+```typescript
+await db.insert(events).values(data).useCompactFormat();
 ```
 
 ### JSON Insert with Returning
@@ -296,6 +310,32 @@ const conditions = [
 const query = await db.select()
   .from(users)
   .where(sql.join(conditions, sql` AND `));
+```
+
+---
+
+## 📊 Benchmarks
+
+Performance tested on local ClickHouse (Docker) with Bun runtime:
+
+| Rows | Method | Time | Throughput |
+|------|--------|------|------------|
+| 1,000 | JSON | 78ms | 12,821 rows/sec |
+| 1,000 | JSONCompact | 67ms | 14,925 rows/sec |
+| 1,000 | Sync Insert | 12ms | 83,333 rows/sec |
+| 5,000 | JSON | 108ms | 46,296 rows/sec |
+| 5,000 | JSONCompact | 56ms | 89,286 rows/sec |
+| 10,000 | JSON | 171ms | 58,480 rows/sec |
+| 10,000 | JSONCompact | 158ms | 63,291 rows/sec |
+
+Key findings:
+- **Sync insert** is fastest for small batches (<5k rows) - up to 6x faster
+- **JSONCompact** provides ~2x improvement for medium batches
+- For high-throughput scenarios, use `.syncInsert()` with batching
+
+Run the benchmark yourself:
+```bash
+bun run benchmark  # in app directory
 ```
 
 ---

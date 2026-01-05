@@ -15,6 +15,22 @@ bun install
 bun run app
 ```
 
+## Benchmark
+
+Run performance benchmarks:
+
+```bash
+bun run benchmark
+```
+
+Sample results (local ClickHouse, Bun runtime):
+
+| Rows | JSONCompact | Sync Insert | Throughput |
+|------|-------------|-------------|------------|
+| 1,000 | 67ms | 12ms | 83k rows/sec |
+| 5,000 | 56ms | 56ms | 89k rows/sec |
+| 10,000 | 158ms | 162ms | 63k rows/sec |
+
 ## What it does
 
 1. Creates `users` and `events` tables
@@ -52,14 +68,17 @@ relations(users, ({ many }) => ({
 
 ## Key Features Demonstrated
 
-### Binary vs JSON Insert
+### Insert Methods
 
 ```typescript
-// Binary insert (default) - fastest, no data returned
+// Standard insert - fastest, no data returned
 await db.insert(events).values(bulkEvents);
 
-// JSON insert with returning - slower but returns inserted data
+// JSON insert with returning - returns inserted data
 const created = await db.insert(users).values(newUsers).returning();
+
+// Sync insert - fastest for small batches
+await db.insert(events).values(data).syncInsert();
 ```
 
 ### Relational Queries
