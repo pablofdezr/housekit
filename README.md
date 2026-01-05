@@ -2,9 +2,16 @@
 
 **The modern developer experience for ClickHouse.**
 
+[![npm version](https://img.shields.io/npm/v/@housekit/orm.svg?style=flat-square)](https://www.npmjs.com/package/@housekit/orm)
+[![npm version](https://img.shields.io/npm/v/@housekit/kit.svg?style=flat-square)](https://www.npmjs.com/package/@housekit/kit)
+[![Documentation](https://img.shields.io/badge/Wiki-Devin%20AI-blueviolet?style=flat-square)](https://deepwiki.com/pablofdezr/housekit)
+
 > ⚠️ **Public Beta**: HouseKit is currently in public beta. While the core API is stable and used in production, some advanced features may change as we head towards v1.0. Contributions and feedback are welcome!
 
 HouseKit is a next-generation toolkit designed to bridge the gap between high-performance OLAP databases and ergonomic, type-safe development. Inspired by best-in-class developer experiences, HouseKit brings first-class TypeScript support to ClickHouse.
+
+> [!TIP]
+> **Ask Devin AI**: Have questions about integrating HouseKit? [Ask the Wiki](https://deepwiki.com/pablofdezr/housekit) for AI-powered assistance.
 
 ---
 
