@@ -5,7 +5,7 @@ import chalk from 'chalk';
 
 const db = housekit(
   {
-    url: process.env.CLICKHOUSE_URL || 'http://localhost:8123',
+    url: process.env.CLICKHOUSE_URL || 'http://localhost:8124',
     username: process.env.CLICKHOUSE_USER || 'admin',
     password: process.env.CLICKHOUSE_PASSWORD || 'admin',
     database: process.env.CLICKHOUSE_DB || 'default',

@@ -5,10 +5,10 @@
     "": {
       "name": "housekit-monorepo",
       "devDependencies": {
-        "@types/node": "^20.0.0",
+        "@types/node": "^20.19.27",
         "bun-types": "latest",
-        "turbo": "^2.7.2",
-        "typescript": "^5.0.0",
+        "turbo": "^2.7.3",
+        "typescript": "^5.9.3",
       },
     },
     "app": {
@@ -22,13 +22,13 @@
     },
     "packages/kit": {
       "name": "@housekit/kit",
-      "version": "0.1.28",
+      "version": "0.1.35",
       "bin": {
         "housekit": "dist/index.js",
       },
       "dependencies": {
-        "@clickhouse/client": "^1.14.0",
-        "@housekit/orm": "^0.1.34",
+        "@clickhouse/client": "^1.15.0",
+        "@housekit/orm": "^0.1.41",
         "boxen": "8.0.1",
         "chalk": "^5.6.2",
         "cli-table3": "^0.6.5",
@@ -46,13 +46,13 @@
     },
     "packages/orm": {
       "name": "@housekit/orm",
-      "version": "0.1.34",
+      "version": "0.1.41",
       "dependencies": {
         "uuid": "^13.0.0",
         "zod": "^4.2.1",
       },
       "devDependencies": {
-        "@clickhouse/client": "^1.14.0",
+        "@clickhouse/client": "^1.15.0",
         "@types/uuid": "^11.0.0",
         "typescript": "^5.0.0",
       },
@@ -62,9 +62,9 @@
     },
   },
   "packages": {
-    "@clickhouse/client": ["@clickhouse/client@1.14.0", "", { "dependencies": { "@clickhouse/client-common": "1.14.0" } }, "sha512-co2spjR7wZoZ3Ck0H/jv76bpiuO3oJHtOmq9/gxFiod2DcT9NFg01u/hXcG8MJFnEJuMB6e3vGqS6IOnLwHqRw=="],
+    "@clickhouse/client": ["@clickhouse/client@1.15.0", "", { "dependencies": { "@clickhouse/client-common": "1.15.0" } }, "sha512-QmW+p4c/r0oa3X6Un6lcBs4GZtJEQUdvf//x8GeqM5ru6m4oIUg3WwvermP3HE31kpEGoFOQfKbMN5ooR5gvNw=="],
 
-    "@clickhouse/client-common": ["@clickhouse/client-common@1.14.0", "", {}, "sha512-CyUcv2iCkZ1A++vmOSufYRpHR3aAWVfbrWed7ATzf0yyx/BW/2SEqlL07vBpSRa3BIkQe/DSOHVv8JkWZpUOwQ=="],
+    "@clickhouse/client-common": ["@clickhouse/client-common@1.15.0", "", {}, "sha512-/1BXaNNsBzH2w5ALWiH6M9zS+cJwlM9uMnMj9e8ETwvDjJzO+nIYlyxzp8Prc+9pEDZ5iAilZ4F8c0YVCzzNaA=="],
 
     "@colors/colors": ["@colors/colors@1.5.0", "", {}, "sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ=="],
 
@@ -278,6 +278,8 @@
 
     "cli-table3/string-width": ["string-width@4.2.3", "", { "dependencies": { "emoji-regex": "^8.0.0", "is-fullwidth-code-point": "^3.0.0", "strip-ansi": "^6.0.1" } }, "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g=="],
 
+    "housekit-app/@clickhouse/client": ["@clickhouse/client@1.14.0", "", { "dependencies": { "@clickhouse/client-common": "1.14.0" } }, "sha512-co2spjR7wZoZ3Ck0H/jv76bpiuO3oJHtOmq9/gxFiod2DcT9NFg01u/hXcG8MJFnEJuMB6e3vGqS6IOnLwHqRw=="],
+
     "housekit-app/chalk": ["chalk@5.3.0", "", {}, "sha512-dLitG79d+GV1Nb/VYcCDFivJeK1hiukt9QjRNVOsUtTy1rR1YJsmpGGTZ3qJos+uw7WmWF4wUwBd9jxjocFC2w=="],
 
     "ora/string-width": ["string-width@8.1.0", "", { "dependencies": { "get-east-asian-width": "^1.3.0", "strip-ansi": "^7.1.0" } }, "sha512-Kxl3KJGb/gxkaUMOjRsQ8IrXiGW75O4E3RPjFIINOVH8AMl2SQ/yWdTzWwF3FevIX9LcMAjJW+GRwAlAbTSXdg=="],
@@ -303,6 +305,8 @@
     "cli-table3/string-width/emoji-regex": ["emoji-regex@8.0.0", "", {}, "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A=="],
 
     "cli-table3/string-width/strip-ansi": ["strip-ansi@6.0.1", "", { "dependencies": { "ansi-regex": "^5.0.1" } }, "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A=="],
+
+    "housekit-app/@clickhouse/client/@clickhouse/client-common": ["@clickhouse/client-common@1.14.0", "", {}, "sha512-CyUcv2iCkZ1A++vmOSufYRpHR3aAWVfbrWed7ATzf0yyx/BW/2SEqlL07vBpSRa3BIkQe/DSOHVv8JkWZpUOwQ=="],
 
     "string-width-cjs/strip-ansi/ansi-regex": ["ansi-regex@5.0.1", "", {}, "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ=="],
 
