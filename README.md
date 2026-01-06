@@ -6,6 +6,8 @@
 [![npm version](https://img.shields.io/npm/v/@housekit/kit.svg?style=flat-square)](https://www.npmjs.com/package/@housekit/kit)
 [![Documentation](https://img.shields.io/badge/Wiki-Devin%20AI-blueviolet?style=flat-square)](https://deepwiki.com/pablofdezr/housekit)
 [![Documentation](https://img.shields.io/badge/Docs-RepoGrep-teal?style=flat-square)](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit)
+[![Documentation](https://img.shields.io/badge/Docs-WarpGrep-blue?style=flat-square)](https://www.morphllm.com/playground/na/warpgrep?repo=pablofdezr%2Fhousekit)
+[![Documentation](https://img.shields.io/badge/Docs-ZRead-orange?style=flat-square)](https://zread.ai/pablofdezr/housekit)
 
 > ⚠️ **Public Beta**: HouseKit is currently in public beta. While the core API is stable and used in production, some advanced features may change as we head towards v1.0. Contributions and feedback are welcome!
 
@@ -124,6 +126,8 @@ Detailed documentation for each component can be found in their respective direc
 - [CLI Commands & Workflow Guide](./packages/kit/README.md)
 - [Demo App](./app/README.md)
 - [Interactive AI Documentation (RepoGrep)](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit) - Query up-to-date documentation for free.
+- [Interactive AI Documentation (WarpGrep)](https://www.morphllm.com/playground/na/warpgrep?repo=pablofdezr%2Fhousekit)
+- [Interactive AI Documentation (ZRead)](https://zread.ai/pablofdezr/housekit)
 
 ---
 
