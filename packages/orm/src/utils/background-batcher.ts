@@ -1,6 +1,5 @@
 import type { ClickHouseClient } from '@clickhouse/client';
 import type { TableRuntime } from '../core';
-import { SyncBinarySerializer } from './binary-worker-pool';
 
 export interface BatchConfig {
     maxRows: number;
@@ -14,24 +13,8 @@ class BackgroundBatcher {
     private timers = new Map<string, NodeJS.Timeout>();
     // Map: "tableName" -> TableRuntime (captured for context)
     private tables = new Map<string, TableRuntime<any, any>>();
-    // Cache of serializers per table to avoid re-creation
-    private serializers = new Map<string, SyncBinarySerializer>();
 
     constructor(private client: ClickHouseClient) { }
-
-    private getSerializer(table: TableRuntime<any, any>): SyncBinarySerializer {
-        const tableName = table.$table;
-        if (!this.serializers.has(tableName)) {
-            // Convert table schema to serializer config
-            const config = Object.values(table.$columns).map((col: any) => ({
-                name: col.name,
-                type: col.type,
-                isNullable: col.isNull
-            }));
-            this.serializers.set(tableName, new SyncBinarySerializer(config));
-        }
-        return this.serializers.get(tableName)!;
-    }
 
     async add(table: TableRuntime<any, any>, row: any, config: BatchConfig) {
         const tableName = table.$table;
@@ -76,29 +59,25 @@ class BackgroundBatcher {
 
         const dataToInsert = [...queue];
         this.queues.set(tableName, []);
-        // We keep the table reference in this.tables for future adds/flushes
 
         try {
-            // RowBinary serialization before sending
-            const serializer = this.getSerializer(table);
-            const binaryBuffer = serializer.serialize(dataToInsert);
-
-            // Wrap buffer in a Readable stream (required by ClickHouse client)
+            // Use JSONEachRow format - well supported by the official client
             const { Readable } = await import('stream');
-            const bufferStream = Readable.from([binaryBuffer]);
+            const stream = Readable.from(dataToInsert, { objectMode: true });
 
             await this.client.insert({
                 table: tableName,
-                values: bufferStream,
-                format: 'RowBinary' as any,
+                values: stream,
+                format: 'JSONEachRow',
                 clickhouse_settings: {
-                    async_insert: 1, // HouseKit enables this by default for throughput
+                    async_insert: 1,
                     wait_for_async_insert: 0,
                 }
             });
         } catch (err) {
             // Background flush failed. In a production app, you might want to 
             // retry or log this to a monitoring service.
+            console.error(`[housekit] Background flush failed for ${tableName}:`, err);
         }
     }
 
