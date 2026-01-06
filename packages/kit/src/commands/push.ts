@@ -154,7 +154,25 @@ export async function pushCommand(options: { database?: string; logExplain?: boo
     } catch (e) {
         error('Push failed');
         error('Error during push:');
-        error(String(e));
+        
+        // Handle AggregateError (multiple errors)
+        if (e instanceof AggregateError) {
+            error('Multiple errors occurred:');
+            for (const err of e.errors) {
+                error(`  • ${err instanceof Error ? err.message : String(err)}`);
+                if (err instanceof Error && err.stack) {
+                    const stackLines = err.stack.split('\n').slice(1, 3);
+                    stackLines.forEach(line => error(`    ${line.trim()}`));
+                }
+            }
+        } else if (e instanceof Error) {
+            error(e.message);
+            if (e.cause) {
+                error(`Caused by: ${e.cause instanceof Error ? e.cause.message : String(e.cause)}`);
+            }
+        } else {
+            error(String(e));
+        }
     } finally {
         await client.close();
     }

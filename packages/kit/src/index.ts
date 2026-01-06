@@ -37,12 +37,34 @@ program.hook('preAction', (thisCommand) => {
     setGlobalYesMode(Boolean((opts as any).yes));
 });
 
+function formatError(err: unknown): string[] {
+    const lines: string[] = [];
+    
+    if (err instanceof AggregateError) {
+        lines.push('Multiple errors occurred:');
+        for (const e of err.errors) {
+            lines.push(`  • ${e instanceof Error ? e.message : String(e)}`);
+        }
+    } else if (err instanceof Error) {
+        lines.push(err.message);
+        if (err.cause) {
+            lines.push(`Caused by: ${err.cause instanceof Error ? err.cause.message : String(err.cause)}`);
+        }
+    } else {
+        lines.push(String(err));
+    }
+    
+    return lines;
+}
+
 function withErrorHandling(fn: (...args: any[]) => Promise<void> | void) {
     return async (...args: any[]) => {
         try {
             await fn(...args);
         } catch (error: any) {
-            console.error(chalk.red('\n✖ Error: ' + (error.message || String(error))));
+            const errorLines = formatError(error);
+            console.error(chalk.red('\n✖ Error: ' + errorLines[0]));
+            errorLines.slice(1).forEach(line => console.error(chalk.red(line)));
             if (process.env.DEBUG) {
                 console.error(error);
             }
