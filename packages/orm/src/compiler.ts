@@ -487,6 +487,13 @@ export class QueryCompiler {
                     Object.assign(params, res.params);
                     colSql = res.sql;
                 }
+                // Check if the SQL expression already contains ASC/DESC
+                // If so, don't append the direction again
+                const sqlUpper = colSql.trim().toUpperCase();
+                const alreadyHasDirection = sqlUpper.endsWith(' ASC') || sqlUpper.endsWith(' DESC');
+                if (alreadyHasDirection) {
+                    return colSql;
+                }
                 return `${colSql} ${o.dir}`;
             });
             orderSql = `ORDER BY ${parts.join(', ')}`;
