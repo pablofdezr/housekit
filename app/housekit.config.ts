@@ -1,5 +1,5 @@
 export default {
-  schema: './src/schema.ts',
+  schema: './src/test-schema',
   out: './housekit',
   databases: {
     default: {

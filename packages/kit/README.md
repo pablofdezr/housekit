@@ -42,6 +42,7 @@ Perfect for early-stage projects or local development. It computes the delta bet
 - **Safe**: Asks for confirmation before any destructive change.
 - **Fast**: Skips the creation of migration files.
 - **Smart**: Handles column renames and type changes.
+- **CI/CD Ready**: Use `-y` flag or pipe commands for non-interactive mode.
 
 ### 2. Controlled Production: `housekit generate` & `migrate`
 The standard for CI/CD and production environments.
@@ -64,6 +65,25 @@ The standard for CI/CD and production environments.
 | `validate` | Checks if code and DB are in sync (exit code 1 on drift). Great for CI. |
 | `list` | Summarizes row counts, engines, and sizes for all tables. |
 | `reset` | Wipes the database and restarts from your code schema (Dev only). |
+
+### Global Options
+
+| Option | Description |
+| :--- | :--- |
+| `-y, --yes` | Auto-confirm all prompts (useful for CI/CD and scripts). |
+| `-d, --database <name>` | Target a specific database from your config. |
+
+### Non-Interactive Mode
+
+When running in non-interactive environments (CI/CD pipelines, scripts with piped input), HouseKit automatically detects this and uses default values for prompts. For explicit control, use the `-y` flag:
+
+```bash
+# Auto-confirm all prompts
+bunx housekit push -y
+
+# Works in CI/CD pipelines
+bunx housekit migrate -y --database production
+```
 
 ---
 

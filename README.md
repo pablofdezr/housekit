@@ -37,6 +37,7 @@ The schema management and migration tool.
 - **Generate Workflow**: Deterministic SQL migrations and snapshots for production.
 - **Introspection**: Connect to existing databases and generate TypeScript code automatically.
 - **Cluster Aware**: Native support for sharded clusters and `ON CLUSTER` operations.
+- **CI/CD Ready**: Non-interactive mode with auto-confirmation for piped commands and scripts.
 
 ---
 
@@ -64,6 +65,9 @@ bunx housekit init
 # 3. Define your first table in src/schema/index.ts
 # (Then sync it to the DB)
 bunx housekit push
+
+# For CI/CD or scripts, use -y to auto-confirm all prompts
+bunx housekit push -y
 ```
 
 ---

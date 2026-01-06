@@ -57,8 +57,20 @@ export function setGlobalYesMode(enabled: boolean) {
     globalYes = enabled;
 }
 
+// Check if stdin is interactive (TTY)
+function isInteractive(): boolean {
+    return process.stdin.isTTY === true;
+}
+
 export async function confirmPrompt(message: string, defaultYes = true) {
     if (globalYes) return true;
+    
+    // If not interactive (piped input), use default value
+    if (!isInteractive()) {
+        info(`${message} (auto-confirmed, non-interactive mode)`);
+        return defaultYes;
+    }
+    
     const { ok } = await inquirer.prompt<{ ok: boolean }>([{
         type: 'confirm',
         name: 'ok',
@@ -84,6 +96,14 @@ export async function listPrompt<T = string>(
 
     if (choices.length === 0) {
         throw new Error('No choices provided to listPrompt');
+    }
+
+    // If not interactive, use default or first choice
+    if (!isInteractive()) {
+        const selected = defaultValue !== undefined ? defaultValue : choices[0].value;
+        const selectedName = choices.find(c => c.value === selected)?.name || String(selected);
+        info(`${message} → ${selectedName} (auto-selected, non-interactive mode)`);
+        return selected;
     }
 
     // According to inquirer docs: default must be the index or value of one of the entries
@@ -126,6 +146,16 @@ export async function inputPrompt(
     if (globalYes && defaultValue !== undefined) {
         return defaultValue;
     }
+    
+    // If not interactive and has default, use it
+    if (!isInteractive()) {
+        if (defaultValue !== undefined) {
+            info(`${message} → ${defaultValue} (auto-selected, non-interactive mode)`);
+            return defaultValue;
+        }
+        throw new Error(`Input required for "${message}" but running in non-interactive mode without default value. Use -y flag with appropriate defaults.`);
+    }
+    
     const { value } = await inquirer.prompt<{ value: string }>([{
         type: 'input',
         name: 'value',
@@ -150,6 +180,13 @@ export async function checkboxPrompt<T = string>(
 
     if (choices.length === 0) {
         throw new Error('No choices provided to checkboxPrompt');
+    }
+
+    // If not interactive, use default or empty array
+    if (!isInteractive()) {
+        const selected = defaultSelected || [];
+        info(`${message} → [${selected.length} items] (auto-selected, non-interactive mode)`);
+        return selected;
     }
 
     const defaultValues = defaultSelected || [];

@@ -1,4 +1,4 @@
-import { resolve, basename, dirname } from 'path';
+import { resolve } from 'path';
 import { existsSync, statSync, mkdirSync } from 'fs';
 import { globSync, Glob } from 'glob';
 import { info } from './ui';
