@@ -11,7 +11,10 @@
 HouseKit is a next-generation toolkit designed to bridge the gap between high-performance OLAP databases and ergonomic, type-safe development. Inspired by best-in-class developer experiences, HouseKit brings first-class TypeScript support to ClickHouse.
 
 > [!TIP]
-> **Ask Devin AI**: Have questions about integrating HouseKit? [Ask the Wiki](https://deepwiki.com/pablofdezr/housekit) for AI-powered assistance.
+> **Ask Devin AI**: Have questions about integrating HouseKit? [Ask the Wiki](https://deepwiki.com/pablofdezr/housekit) for AI-powered assistance (Updated weekly).
+
+> [!TIP]
+> **Interactive Docs**: Use [RepoGrep](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit) to search and query the entire codebase and documentation for free (Updated instantly).
 
 ---
 
@@ -115,6 +118,7 @@ Detailed documentation for each component can be found in their respective direc
 - [ORM Core Documentation & API Reference](./packages/orm/README.md)
 - [CLI Commands & Workflow Guide](./packages/kit/README.md)
 - [Demo App](./app/README.md)
+- [Interactive AI Documentation (RepoGrep)](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit) - Query up-to-date documentation for free.
 
 ---
 
