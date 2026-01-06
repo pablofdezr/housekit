@@ -3,15 +3,11 @@ import { ClickHouseColumn, type TableDefinition, type TableOptions, type InferSe
 import { sql, type SQLExpression, eq } from '../expressions';
 import { and } from '../modules/conditional';
 import { QueryCompiler } from '../compiler';
-import { BinaryReader, createBinaryDecoder, type BinaryDecoder } from '../utils/binary-reader';
 import {
     type QueryBuilderState,
     type SelectionShape,
     type SelectResult,
-    type ArrayJoinResult,
     type ResultWithArrayJoin,
-    type ResultWithMultipleArrayJoins,
-    type SubqueryToTable,
     type InferQueryResult
 } from './select.types';
 export type {
@@ -720,139 +716,35 @@ export class ClickHouseQueryBuilder<
 
     /**
      * Native binary mode for high-performance data retrieval.
-     * Reads data using ClickHouse 'RowBinary' format and parses it directly in Node.js.
-     * Up to 10x faster than standard JSON select for large datasets.
      * 
-     * Requirements: All selected columns must be strictly typed (ClickHouseColumn instances).
+     * @deprecated RowBinary streaming is not supported by @clickhouse/client 1.15+.
+     * Use standard select() which uses optimized JSONEachRow format.
      */
     async native(): Promise<TResult[]> {
-        return this.executeBinary('object') as Promise<TResult[]>;
+        // RowBinary is no longer supported for streaming in @clickhouse/client 1.15+
+        // Fall back to standard JSON execution
+        console.warn('[HouseKit] native() is deprecated. RowBinary streaming is not supported by @clickhouse/client 1.15+. Using JSONEachRow instead.');
+        return this.then(data => data) as Promise<TResult[]>;
     }
 
     /**
      * Vector mode for columnar data retrieval.
-     * Returns data in Columnar format (TypedArrays) instead of Row-based objects.
-     * Ideal for analytical processing, charting, or passing to libraries like Apache Arrow.
      * 
-     * @example
-     * const { prices } = await db.select({ prices: trades.price }).vector();
-     * // prices is a Float64Array
+     * @deprecated RowBinary streaming is not supported by @clickhouse/client 1.15+.
+     * Use standard select() which uses optimized JSONEachRow format.
      */
     async vector(): Promise<{ [K in keyof TResult]: TResult[K] extends number ? (TResult[K] extends number ? Float64Array | Int32Array : Array<TResult[K]>) : Array<TResult[K]> }> {
-        return this.executeBinary('vector') as any;
-    }
-
-    private async executeBinary(mode: 'object' | 'vector'): Promise<any> {
-        const compiler = new QueryCompiler();
-        // Force compile to get SQL and Columns
-        const state = this.getState();
-
-        // 1. Resolve Schema & Validators
-        const columns: { name: string; type: string; decoder: BinaryDecoder }[] = [];
-
-        if (state.select) {
-            for (const [key, val] of Object.entries(state.select)) {
-                if (val instanceof ClickHouseColumn) {
-                    columns.push({ name: key, type: val.type, decoder: createBinaryDecoder(val.type) });
-                } else if (val && typeof val === 'object' && '_type' in val && (val as any).type) {
-                    // Support typed SQLExpression if we add .type property? 
-                    // For now, strict check.
-                    throw new Error(`[HouseKit] Binary mode requires strictly typed columns. Field '${key}' is an expression without type info.`);
-                } else {
-                    // Try to infer? No, unsafe for RowBinary.
-                    throw new Error(`[HouseKit] Binary mode requires strictly typed columns. Field '${key}' is not a ClickHouseColumn.`);
-                }
-            }
-        } else if (state.table) {
-            // Select * from table
-            const tableCols = state.table.$columns;
-            for (const [key, col] of Object.entries(tableCols)) {
-                columns.push({ name: key, type: (col as ClickHouseColumn).type, decoder: createBinaryDecoder((col as ClickHouseColumn).type) });
-            }
-        } else {
-            throw new Error('[HouseKit] Binary mode requires a table or explicit selection.');
+        // RowBinary is no longer supported for streaming in @clickhouse/client 1.15+
+        console.warn('[HouseKit] vector() is deprecated. RowBinary streaming is not supported by @clickhouse/client 1.15+. Using JSONEachRow instead.');
+        const rows = await this.then(data => data);
+        // Convert to columnar format from row data
+        if (rows.length === 0) return {} as any;
+        const result: Record<string, any[]> = {};
+        const keys = Object.keys(rows[0] as any);
+        for (const key of keys) {
+            result[key] = rows.map((row: any) => row[key]);
         }
-
-        // 2. Prepare Query with RowBinary format
-        const { cachedQuery, values } = compiler.compileWithCache(state, this.client);
-        const query_params: Record<string, any> = {};
-        for (let i = 0; i < values.length; i++) {
-            query_params[`p_${i + 1}`] = values[i];
-        }
-
-        const resultSet = await this.client.query({
-            query: cachedQuery.sql,
-            query_params,
-            format: 'RowBinary' as any, // Request raw binary
-        });
-
-        // 3. Read Stream into Buffer
-        const chunks: Buffer[] = [];
-        const stream = resultSet.stream();
-        for await (const chunk of stream) {
-            chunks.push(chunk as any as Buffer);
-        }
-        const fullBuffer = Buffer.concat(chunks);
-
-        // 4. Parse
-        const reader = new BinaryReader(fullBuffer);
-        const count = fullBuffer.length; // Approximate check? No, we read until EOF.
-
-        if (mode === 'object') {
-            const rows: any[] = [];
-            while (!reader.isEOF()) {
-                const row: Record<string, any> = {};
-                for (const col of columns) {
-                    row[col.name] = col.decoder(reader);
-                }
-                rows.push(row);
-            }
-            return rows;
-        } else {
-            // Vector mode
-            // We need to determine length first to allocate TypedArrays?
-            // RowBinary doesn't send row count header.
-            // So we use dynamic arrays and convert, or read twice (slow), or use chunked allocation.
-            // For max speed, simple JS arrays then convert is often fast enough, 
-            // but TypedArrays are better.
-            // Let's use simple arrays for "complex" types and TypedArrays for numbers?
-            // Constructing TypedArray from array is fast.
-
-            const data: Record<string, any[]> = {};
-            for (const col of columns) {
-                data[col.name] = [];
-            }
-
-            while (!reader.isEOF()) {
-                for (const col of columns) {
-                    data[col.name].push(col.decoder(reader));
-                }
-            }
-
-            // Convert to TypedArrays where possible
-            const finalVectors: Record<string, any> = {};
-            for (const col of columns) {
-                const arr = data[col.name];
-                const type = col.type.toLowerCase();
-
-                if (type.includes('int') || type.includes('float')) {
-                    if (type === 'int8') finalVectors[col.name] = new Int8Array(arr);
-                    else if (type === 'uint8') finalVectors[col.name] = new Uint8Array(arr);
-                    else if (type === 'int16') finalVectors[col.name] = new Int16Array(arr);
-                    else if (type === 'uint16') finalVectors[col.name] = new Uint16Array(arr);
-                    else if (type === 'int32') finalVectors[col.name] = new Int32Array(arr);
-                    else if (type === 'uint32') finalVectors[col.name] = new Uint32Array(arr);
-                    else if (type === 'int64') finalVectors[col.name] = new BigInt64Array(arr as bigint[]);
-                    else if (type === 'uint64') finalVectors[col.name] = new BigUint64Array(arr as bigint[]);
-                    else if (type === 'float32') finalVectors[col.name] = new Float32Array(arr);
-                    else if (type === 'float64') finalVectors[col.name] = new Float64Array(arr);
-                    else finalVectors[col.name] = arr; // Decimals etc
-                } else {
-                    finalVectors[col.name] = arr;
-                }
-            }
-            return finalVectors;
-        }
+        return result as any;
     }
 
     async explain(): Promise<any> {
