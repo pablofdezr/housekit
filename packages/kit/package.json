@@ -1,6 +1,6 @@
 {
     "name": "@housekit/kit",
-    "version": "0.1.36",
+    "version": "0.1.37",
     "description": "CLI tool for HouseKit - manage ClickHouse schemas, migrations, and database operations with type-safe workflows.",
     "type": "module",
     "main": "./dist/index.js",
@@ -48,7 +48,7 @@
     },
     "dependencies": {
         "@clickhouse/client": "^1.15.0",
-        "@housekit/orm": "^0.1.42",
+        "@housekit/orm": "^0.1.43",
         "boxen": "8.0.1",
         "chalk": "^5.6.2",
         "cli-table3": "^0.6.5",
