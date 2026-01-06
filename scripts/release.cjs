@@ -214,14 +214,29 @@ function bumpPackage(packageName, versionArgs) {
 }
 
 /**
- * Build packages
+ * Build packages (clean build)
  */
 function buildPackages(packages) {
     if (!packages.includes('orm') && !packages.includes('kit')) {
         return;
     }
 
-    console.log('\n🏗️  Building packages...');
+    console.log('\n🏗️  Building packages (clean)...');
+
+    // Clean turbo cache and dist folders for a fresh build
+    const packagesToClean = [];
+    if (packages.includes('orm')) {
+        packagesToClean.push(path.join(__dirname, '..', 'packages', 'orm', 'dist'));
+    }
+    if (packages.includes('kit')) {
+        packagesToClean.push(path.join(__dirname, '..', 'packages', 'kit', 'dist'));
+    }
+
+    for (const distPath of packagesToClean) {
+        if (fs.existsSync(distPath)) {
+            fs.rmSync(distPath, { recursive: true, force: true });
+        }
+    }
 
     const filters = [];
     if (packages.includes('orm')) {
@@ -232,7 +247,8 @@ function buildPackages(packages) {
     }
 
     try {
-        execSync(`bun run build ${filters.join(' ')}`, { stdio: 'inherit' });
+        // Use --force to bypass turbo cache
+        execSync(`bun run build ${filters.join(' ')} --force`, { stdio: 'inherit' });
         console.log('   ✅ Build completed');
     } catch (error) {
         console.error('   ❌ Build failed');
