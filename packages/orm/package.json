@@ -1,6 +1,6 @@
 {
     "name": "@housekit/orm",
-    "version": "0.1.38",
+    "version": "0.1.39",
     "description": "Type-safe ClickHouse ORM with modern DX and ClickHouse-specific optimizations. Features optimized JSONCompact streaming, full engine support, and advanced query capabilities.",
     "type": "module",
     "main": "./dist/index.js",
