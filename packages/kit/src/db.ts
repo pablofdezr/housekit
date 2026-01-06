@@ -30,9 +30,25 @@ export function resolveDatabase(config: HouseKitConfig, name?: string): Resolved
     // If host is provided without protocol, add http:// prefix
     let url = selected.db.url;
     if (!url && selected.db.host) {
-        url = selected.db.host.startsWith('http://') || selected.db.host.startsWith('https://')
-            ? selected.db.host
-            : `http://${selected.db.host}`;
+        let host = selected.db.host;
+        // Add protocol if missing
+        if (!host.startsWith('http://') && !host.startsWith('https://')) {
+            host = `http://${host}`;
+        }
+        // Add port if specified and not already in the host
+        if (selected.db.port) {
+            try {
+                const parsed = new URL(host);
+                if (!parsed.port) {
+                    parsed.port = String(selected.db.port);
+                    host = parsed.toString().replace(/\/$/, ''); // Remove trailing slash
+                }
+            } catch {
+                // If URL parsing fails, append port directly
+                host = `${host}:${selected.db.port}`;
+            }
+        }
+        url = host;
     }
     url = url || 'http://localhost:8123';
 
