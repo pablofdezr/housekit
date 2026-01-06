@@ -1,4 +1,4 @@
-import { resolve } from 'path';
+import { resolve, basename, dirname } from 'path';
 import { existsSync, statSync, mkdirSync } from 'fs';
 import { globSync, Glob } from 'glob';
 import { info } from './ui';
@@ -28,9 +28,34 @@ export async function loadSchema(schemaPath: string, options?: { quiet?: boolean
         }
     }
 
+    // Deduplicate files by base name (prefer .ts over .js)
+    // This prevents loading both index.ts and index.js, or foo.schema.ts and foo.schema.js
+    const filesByBaseName = new Map<string, string>();
+    const extensionPriority: Record<string, number> = { '.ts': 0, '.mjs': 1, '.cjs': 2, '.js': 3 };
+    
+    for (const file of allFiles) {
+        const ext = extensions.find(e => file.endsWith(e)) || '.js';
+        const baseNameWithoutExt = file.slice(0, -ext.length);
+        
+        const existing = filesByBaseName.get(baseNameWithoutExt);
+        if (existing) {
+            const existingExt = extensions.find(e => existing.endsWith(e)) || '.js';
+            // Keep the one with higher priority (lower number)
+            if (extensionPriority[ext] < extensionPriority[existingExt]) {
+                filesByBaseName.set(baseNameWithoutExt, file);
+            }
+        } else {
+            filesByBaseName.set(baseNameWithoutExt, file);
+        }
+    }
+    
+    const deduplicatedFiles = Array.from(filesByBaseName.values());
+
     // Process files
     const foundTables: string[] = [];
-    for (const file of allFiles) {
+    const tableSourceFile: Record<string, string> = {}; // Track which file defined each table
+    
+    for (const file of deduplicatedFiles) {
         const fullPath = resolve(process.cwd(), file);
 
         try {
@@ -43,9 +68,14 @@ export async function loadSchema(schemaPath: string, options?: { quiet?: boolean
                 if (value && typeof value === 'object' && 'toSQL' in value && '$columns' in value && '$table' in value) {
                     const table = value as any;
                     if (tables[table.$table]) {
-                        throw new Error(`Duplicate: Table "${table.$table}" is defined multiple times.`);
+                        // Skip if it's the same table object (re-exported from another file)
+                        if (tables[table.$table] === table) {
+                            continue;
+                        }
+                        throw new Error(`Duplicate: Table "${table.$table}" is defined multiple times (in ${tableSourceFile[table.$table]} and ${file}).`);
                     }
                     tables[table.$table] = table;
+                    tableSourceFile[table.$table] = file;
                     foundTables.push(`${table.$table}${key !== table.$table ? ` (${key})` : ''}`);
                 }
             }
