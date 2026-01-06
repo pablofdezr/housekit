@@ -182,12 +182,33 @@ function normalizeClause(val: any): string | undefined {
     return String(val);
 }
 
+function normalizePartitionExpr(val?: string): string | undefined {
+    if (!val) return undefined;
+    // Normalize to lowercase and remove spaces for comparison
+    let normalized = val.toLowerCase().replace(/\s+/g, '');
+    // ClickHouse returns function names without arguments when they're implicit
+    // e.g., toYYYYMM(day) becomes toYYYYMM in SHOW CREATE TABLE
+    // We need to compare just the function name for partition expressions
+    return normalized;
+}
+
 function normalizeTtlExpr(val?: string) {
     if (!val) return undefined;
-    return val
+    let normalized = val
         .toLowerCase()
-        .replace(/\s+/g, '')
-        .replace(/tointervalday\((\d+)\)/g, 'interval$1day');
+        .replace(/\s+/g, '');
+    
+    // Normalize interval expressions:
+    // - tointervalday(N) -> intervalNday
+    // - tointervalyear(N) -> intervalNyear  
+    // - tointervalmonth(N) -> intervalNmonth
+    // - interval N day -> intervalNday
+    // - INTERVAL 3 YEAR -> interval3year
+    normalized = normalized
+        .replace(/tointerval(day|year|month|week|hour|minute|second)\((\d+)\)/g, 'interval$2$1')
+        .replace(/interval\s*(\d+)\s*(day|year|month|week|hour|minute|second)/g, 'interval$1$2');
+    
+    return normalized;
 }
 
 function canonicalName(name: string) {
@@ -339,8 +360,26 @@ export function diffTable(
 
     const compare = (label: string, local: any, remoteValue: any, action?: () => void) => {
         if (!local && !remoteValue) return;
-        const l = label === 'ttl' ? normalizeTtlExpr(normalizeClause(local)) : normalizeClause(local);
-        const r = label === 'ttl' ? normalizeTtlExpr(normalizeClause(remoteValue)) : normalizeClause(remoteValue);
+        let l: string | undefined;
+        let r: string | undefined;
+        
+        if (label === 'ttl') {
+            l = normalizeTtlExpr(normalizeClause(local));
+            r = normalizeTtlExpr(normalizeClause(remoteValue));
+        } else if (label === 'partitionBy') {
+            l = normalizePartitionExpr(normalizeClause(local));
+            r = normalizePartitionExpr(normalizeClause(remoteValue));
+            // ClickHouse often omits the column argument in partition functions
+            // e.g., toYYYYMM(day) is stored as just toYYYYMM
+            // Check if local contains remote as a prefix (function name match)
+            if (l && r && l.startsWith(r + '(')) {
+                return; // Same partition function, just different representation
+            }
+        } else {
+            l = normalizeClause(local);
+            r = normalizeClause(remoteValue);
+        }
+        
         if ((l || 'unset') !== (r || 'unset')) {
             optionChanges.push(label);
             if (action) action();
