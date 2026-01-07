@@ -12,6 +12,8 @@
 [![npm](https://nodei.co/npm/@housekit/orm.png)](https://www.npmjs.com/package/@housekit/orm)
 [![npm](https://nodei.co/npm/@housekit/kit.png)](https://www.npmjs.com/package/@housekit/kit)
 
+![Weekly Downloads](https://img.shields.io/npm/dw/@housekit/orm.svg?color=orange) ![Weekly Downloads](https://img.shields.io/npm/dw/@housekit/kit.svg?color=orange)
+
 > ⚠️ **Public Beta**: HouseKit is currently in public beta. While the core API is stable and used in production, some advanced features may change as we head towards v1.0. Contributions and feedback are welcome!
 
 HouseKit is a next-generation toolkit designed to bridge the gap between high-performance OLAP databases and ergonomic, type-safe development. Inspired by best-in-class developer experiences, HouseKit brings first-class TypeScript support to ClickHouse.
