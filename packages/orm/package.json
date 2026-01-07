@@ -1,6 +1,6 @@
 {
     "name": "@housekit/orm",
-    "version": "0.1.47",
+    "version": "0.1.48",
     "description": "Type-safe ClickHouse ORM with modern DX and ClickHouse-specific optimizations. Features optimized JSONCompact streaming, full engine support, and advanced query capabilities.",
     "type": "module",
     "main": "./dist/index.js",
@@ -10,6 +10,70 @@
         ".": {
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
+        },
+        "./client": {
+            "types": "./dist/client.d.ts",
+            "import": "./dist/client.js"
+        },
+        "./table": {
+            "types": "./dist/table.d.ts",
+            "import": "./dist/table.js"
+        },
+        "./column": {
+            "types": "./dist/column.d.ts",
+            "import": "./dist/column.js"
+        },
+        "./expressions": {
+            "types": "./dist/expressions.d.ts",
+            "import": "./dist/expressions.js"
+        },
+        "./schema-builder": {
+            "types": "./dist/schema-builder.d.ts",
+            "import": "./dist/schema-builder.js"
+        },
+        "./relational": {
+            "types": "./dist/relational.d.ts",
+            "import": "./dist/relational.js"
+        },
+        "./engines": {
+            "types": "./dist/engines.d.ts",
+            "import": "./dist/engines.js"
+        },
+        "./data-types": {
+            "types": "./dist/data-types.d.ts",
+            "import": "./dist/data-types.js"
+        },
+        "./materialized-views": {
+            "types": "./dist/materialized-views.d.ts",
+            "import": "./dist/materialized-views.js"
+        },
+        "./compiler": {
+            "types": "./dist/compiler.d.ts",
+            "import": "./dist/compiler.js"
+        },
+        "./external": {
+            "types": "./dist/external.d.ts",
+            "import": "./dist/external.js"
+        },
+        "./dictionary": {
+            "types": "./dist/dictionary.d.ts",
+            "import": "./dist/dictionary.js"
+        },
+        "./codegen": {
+            "types": "./dist/codegen/index.d.ts",
+            "import": "./dist/codegen/index.js"
+        },
+        "./utils": {
+            "types": "./dist/utils/index.d.ts",
+            "import": "./dist/utils/index.js"
+        },
+        "./modules": {
+            "types": "./dist/modules/index.d.ts",
+            "import": "./dist/modules/index.js"
+        },
+        "./builders": {
+            "types": "./dist/builders/index.d.ts",
+            "import": "./dist/builders/index.js"
         }
     },
     "license": "MIT",
@@ -43,7 +107,7 @@
         "README.md"
     ],
     "scripts": {
-        "build": "bun run build-worker.ts && bun build ./src/index.ts --outdir ./dist --target node --external @clickhouse/client --external uuid --external zod && tsc --project tsconfig.build.json",
+        "build": "bun run build-worker.ts && tsc --project tsconfig.build.json",
         "prepublishOnly": "bun run build",
         "clean": "rm -rf dist"
     },
@@ -57,7 +121,8 @@
     "devDependencies": {
         "@clickhouse/client": "^1.15.0",
         "@types/uuid": "^11.0.0",
-        "typescript": "^5.0.0"
+        "typescript": "^5.0.0",
+        "esbuild": "^0.27.2"
     },
     "publishConfig": {
         "access": "public"
