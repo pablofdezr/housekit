@@ -207,8 +207,6 @@ await db.close();
 
 ---
 
----
-
 ## 🔍 Relational Query API
 
 ### findMany / findFirst
