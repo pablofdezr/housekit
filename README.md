@@ -2,6 +2,8 @@
 
 **The modern developer experience for ClickHouse.**
 
+[![npm](https://nodei.co/npm/@housekit/orm.png)](https://www.npmjs.com/package/@housekit/orm)
+[![npm](https://nodei.co/npm/@housekit/kit.png)](https://www.npmjs.com/package/@housekit/kit)
 [![npm version](https://img.shields.io/npm/v/@housekit/orm.svg?style=flat-square)](https://www.npmjs.com/package/@housekit/orm)
 [![npm version](https://img.shields.io/npm/v/@housekit/kit.svg?style=flat-square)](https://www.npmjs.com/package/@housekit/kit)
 [![Documentation](https://img.shields.io/badge/Docs-RepoGrep-teal?style=flat-square)](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit)

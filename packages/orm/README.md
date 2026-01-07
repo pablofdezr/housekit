@@ -2,16 +2,17 @@
 
 **The high-performance, type-safe ClickHouse ORM for Node.js and Bun.**
 
-> ⚠️ **Public Beta**: This package is currently in public beta. Feedback is highly appreciated as we polish the API for v1.0.
+> ⚠️ **Public Beta**: This package is currently in public beta. Feedback is highly appreciated as we polish API for v1.0.
 
-> 💡 **Interactive Docs**: Use [RepoGrep](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit) to search and query the entire codebase and documentation for free (Updated instantly).
+> 💡 **Interactive Docs**: Use [RepoGrep](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit) to search and query entire codebase and documentation for free (Updated instantly).
 
-> 💡 **Ask ZRead**: Need deep insights? [Ask ZRead](https://zread.ai/pablofdezr/housekit) for AI-powered understanding of the codebase (Updated weekly).
+> 💡 **Ask ZRead**: Need deep insights? [Ask ZRead](https://zread.ai/pablofdezr/housekit) for AI-powered understanding of codebase (Updated weekly).
 
-> 💡 **Ask Devin AI**: Have questions about integrating HouseKit? [Ask the Wiki](https://deepwiki.com/pablofdezr/housekit) for AI-powered assistance (Updated weekly).
+> 💡 **Ask Devin AI**: Have questions about integrating HouseKit? [Ask Wiki](https://deepwiki.com/pablofdezr/housekit) for AI-powered assistance (Updated weekly).
 
-HouseKit ORM is a modern database toolkit designed specifically for ClickHouse. It bridges the gap between ergonomic developer experiences and the extreme performance requirements of high-volume OLAP workloads.
+HouseKit ORM is a modern database toolkit designed specifically for ClickHouse. It bridges gap between ergonomic developer experiences and extreme performance requirements of high-volume OLAP workloads.
 
+[![npm](https://nodei.co/npm/@housekit/orm.png)](https://www.npmjs.com/package/@housekit/orm)
 [![npm version](https://img.shields.io/npm/v/@housekit/orm.svg)](https://www.npmjs.com/package/@housekit/orm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/Docs-RepoGrep-teal?style=flat-square)](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit)
@@ -124,6 +125,86 @@ const [user] = await db
   .values({ email: 'a@b.com', role: 'admin' })
   .returning();
 ```
+
+---
+
+## 🎯 The `housekit()` Client
+
+The `housekit()` function creates a fully-featured ClickHouse client with query builders for all operations.
+
+### Client Methods
+
+| Method | Description |
+|--------|-------------|
+| **`db.select()`** | Creates a SELECT query builder |
+| **`db.insert(table)`** | Inserts data into a table |
+| **`db.insertMany(table, data, opts)`** | Bulk inserts with configuration |
+| **`db.update(table)`** | Updates rows in a table |
+| **`db.delete(table)`** | Deletes rows from a table |
+| **`db.raw(sql, params)`** | Executes raw SQL queries |
+| **`db.command({query, query_params})`** | Executes ClickHouse commands |
+| **`db.close()`** | Closes the connection |
+
+### Client Properties
+
+| Property | Description |
+|----------|-------------|
+| **`db.rawClient`** | Raw `@clickhouse/client` instance (direct access) |
+| **`db.query`** ⭐ | **Relational API** - only available if `{ schema }` is passed |
+| **`db.schema`** | Your defined table schema |
+
+### ⭐ The Relational API (`db.query`)
+
+**Only available when you pass a schema:**
+
+```typescript
+const db = housekit({ url: 'http://localhost:8123' }, { 
+  schema: { users, events } 
+});
+```
+
+Then you can query using ORM-style methods:
+
+```typescript
+// Find by ID
+db.query.users.findById('uuid-here');
+
+// Find many with conditions
+db.query.users.findMany({ where: { role: 'admin' } });
+
+// Find first with columns
+db.query.users.findFirst({ columns: { id: true, email: true } });
+
+// Find with relations (automatic JOIN)
+db.query.users.findMany({ 
+  with: { posts: true } 
+});
+```
+
+### Complete Example
+
+```typescript
+const db = housekit({ url: 'http://localhost:8123' }, { schema });
+
+// 1. Insert using builder
+await db.insert(schema.users).values({ email: 'a@b.com', role: 'admin' });
+
+// 2. Regular SELECT
+const result = await db.select().from(schema.users).where(eq(schema.users.role, 'admin'));
+
+// 3. Relational query (automatic JOIN)
+const user = await db.query.users.findById('uuid-here', {
+  with: { posts: true }
+});
+
+// 4. Raw SQL
+const data = await db.raw('SELECT * FROM users LIMIT 10');
+
+// 5. Close connection
+await db.close();
+```
+
+---
 
 ---
 
