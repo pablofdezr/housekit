@@ -326,6 +326,40 @@ await db.select()
 
 ---
 
+## 📦 Bundle Size & Performance
+
+HouseKit is optimized for minimal bundle impact in your applications:
+
+| Metric | Value |
+|--------|-------|
+| **Tarball Size** | 96KB |
+| **Unpacked Size** | 644KB |
+| **Tree Shaking** | ✅ Enabled |
+| **Granular Exports** | 17 paths for precise imports |
+
+### Optimizations
+
+- **Modular Build**: 46 separate JS files vs 1 monolithic bundle
+- **Tree-Shakable**: Consumers can eliminate unused code automatically
+- **Granular Exports**: Import only what you need
+- **No Runtime Overhead**: Zero runtime dependency overhead
+
+### Import Examples
+
+```typescript
+// Import everything (full bundle)
+import { housekit, Engine, t } from '@housekit/orm';
+
+// Import specific modules only (recommended for tree-shaking)
+import { Engine } from '@housekit/orm/engines';
+import { defineTable, t } from '@housekit/orm/schema-builder';
+import { ClickHouseColumn } from '@housekit/orm/column';
+```
+
+**Note**: While HouseKit includes advanced features like binary serialization, engines, and relations (96KB), the modular structure ensures your bundle only includes what you actually use.
+
+---
+
 ## 🛠 SQL Utilities
 
 ### Dynamic Queries

@@ -3,9 +3,11 @@
   "compilerOptions": {
     "declaration": true,
     "declarationDir": "./dist",
+    "outDir": "./dist",
     "rootDir": "./src",
-    "emitDeclarationOnly": true,
-    "noEmit": false
+    "noEmit": false,
+    "removeComments": true,
+    "stripInternal": true
   },
   "include": [
     "src/**/*"
