@@ -20,6 +20,8 @@ HouseKit CLI brings a modern, streamlined developer experience to the ClickHouse
 [![Documentation](https://img.shields.io/badge/Wiki-Devin%20AI-blueviolet?style=flat-square)](https://deepwiki.com/pablofdezr/housekit)
 [![Documentation](https://img.shields.io/badge/Docs-WarpGrep-blue?style=flat-square)](https://www.morphllm.com/playground/na/warpgrep?repo=pablofdezr%2Fhousekit)
 
+[![npm](https://nodei.co/npm/@housekit/kit.png)](https://www.npmjs.com/package/@housekit/kit)
+
 ---
 
 ## 🚀 Why HouseKit CLI?
