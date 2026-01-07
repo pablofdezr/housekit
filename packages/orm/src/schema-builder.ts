@@ -98,8 +98,7 @@ function primaryUuid<TName extends string>(name?: TName) {
     const colName = (name ?? 'id') as TName;
     const column = new ClickHouseColumn<string>(colName, 'UUID')
         .autoGenerate()
-        .primaryKey()
-        .default('generateUUIDv4()');
+        .primaryKey();
     return {
         [colName]: column
     } as { [K in TName]: typeof column };
@@ -111,8 +110,7 @@ function primaryUuidV7<TName extends string>(name?: TName) {
     const colName = (name ?? 'id') as TName;
     const column = new ClickHouseColumn<string>(colName, 'UUID')
         .autoGenerate({ version: 7 })
-        .primaryKey()
-        .default('generateUUIDv7()');
+        .primaryKey();
     return {
         [colName]: column
     } as { [K in TName]: typeof column };
