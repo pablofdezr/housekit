@@ -3,8 +3,7 @@ import { defineTable, t, Engine, relations } from '@housekit/orm';
 export const users = defineTable('users', {
   id: t.uuid('id')
     .autoGenerate({ version: 7 })
-    .primaryKey()
-    .default('generateUUIDv7()'),
+    .primaryKey(),
   email: t.string('email'),
   role: t.enum('role', ['admin', 'user']),
   password: t.string('password'),
@@ -18,8 +17,7 @@ export const users = defineTable('users', {
 export const events = defineTable('events', {
   id: t.uuid('id')
     .autoGenerate({ version: 7 })
-    .primaryKey()
-    .default('generateUUIDv7()'),
+    .primaryKey(),
   userId: t.uuid('user_id'),
   type: t.string('type'),
   createdAt: t.timestamp('created_at').default('now()'),
