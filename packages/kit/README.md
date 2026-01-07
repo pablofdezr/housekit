@@ -4,14 +4,11 @@
 
 > ⚠️ **Public Beta**: HouseKit CLI is currently in public beta. We are actively refining the migration engine and cluster management features.
 
-> [!TIP]
-> **Interactive Docs**: Use [RepoGrep](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit) to search and query the entire codebase and documentation for free (Updated instantly).
+> 💡 **Interactive Docs**: Use [RepoGrep](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit) to search and query the entire codebase and documentation for free (Updated instantly).
 
-> [!TIP]
-> **Ask ZRead**: Need deep insights? [Ask ZRead](https://zread.ai/pablofdezr/housekit) for AI-powered understanding of the codebase (Updated weekly).
+> 💡 **Ask ZRead**: Need deep insights? [Ask ZRead](https://zread.ai/pablofdezr/housekit) for AI-powered understanding of the codebase (Updated weekly).
 
-> [!TIP]
-> **Ask Devin AI**: Have questions about integrating HouseKit? [Ask the Wiki](https://deepwiki.com/pablofdezr/housekit) for AI-powered assistance (Updated weekly).
+> 💡 **Ask Devin AI**: Have questions about integrating HouseKit? [Ask the Wiki](https://deepwiki.com/pablofdezr/housekit) for AI-powered assistance (Updated weekly).
 
 HouseKit CLI brings a modern, streamlined developer experience to the ClickHouse ecosystem. Manage your sharded clusters, analytical tables, and complex materialized views using purely TypeScript—no more manual SQL migration files or structural drift.
 

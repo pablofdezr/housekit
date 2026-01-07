@@ -4,14 +4,11 @@
 
 > ⚠️ **Public Beta**: This package is currently in public beta. Feedback is highly appreciated as we polish the API for v1.0.
 
-> [!TIP]
-> **Interactive Docs**: Use [RepoGrep](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit) to search and query the entire codebase and documentation for free (Updated instantly).
+> 💡 **Interactive Docs**: Use [RepoGrep](https://app.ami.dev/repogrep?repo=https://github.com/pablofdezr/housekit) to search and query the entire codebase and documentation for free (Updated instantly).
 
-> [!TIP]
-> **Ask ZRead**: Need deep insights? [Ask ZRead](https://zread.ai/pablofdezr/housekit) for AI-powered understanding of the codebase (Updated weekly).
+> 💡 **Ask ZRead**: Need deep insights? [Ask ZRead](https://zread.ai/pablofdezr/housekit) for AI-powered understanding of the codebase (Updated weekly).
 
-> [!TIP]
-> **Ask Devin AI**: Have questions about integrating HouseKit? [Ask the Wiki](https://deepwiki.com/pablofdezr/housekit) for AI-powered assistance (Updated weekly).
+> 💡 **Ask Devin AI**: Have questions about integrating HouseKit? [Ask the Wiki](https://deepwiki.com/pablofdezr/housekit) for AI-powered assistance (Updated weekly).
 
 HouseKit ORM is a modern database toolkit designed specifically for ClickHouse. It bridges the gap between ergonomic developer experiences and the extreme performance requirements of high-volume OLAP workloads.
 
@@ -99,6 +96,16 @@ id: t.uuid('id').primaryKey().default('generateUUIDv7()')
 ```
 
 **Note:** Don't combine both - it's redundant. Choose one based on whether you need `.returning()` support.
+
+**Custom IDs:** You can always provide your own ID when inserting - autoGenerate only kicks in when the field is `undefined`:
+
+```typescript
+// Auto-generated UUID
+await db.insert(users).values({ email: 'a@b.com' });
+
+// Custom ID provided by user
+await db.insert(users).values({ id: 'my-custom-uuid', email: 'a@b.com' });
+```
 
 ### 2. Connect and Query
 
