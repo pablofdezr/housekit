@@ -1,0 +1,245 @@
+{
+  "repo_notes": [
+    {
+      "content": ""
+    }
+  ],
+  "pages": [
+    {
+      "title": "Overview",
+      "purpose": "Introduce HouseKit at a high level - what it is, its purpose as a modern ClickHouse ORM and CLI toolkit, and the key problems it solves",
+      "page_notes": [
+        {
+          "content": "Highlight its features"
+        }
+      ]
+    },
+    {
+      "title": "Monorepo Structure",
+      "purpose": "Explain how the HouseKit monorepo is organized, including the packages, apps, and scripts directories, and how Turbo and Bun are used for orchestration",
+      "parent": "Overview",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Package Dependencies",
+      "purpose": "Document the dependency relationships between @housekit/orm and @housekit/kit, and how they interact with external dependencies like ClickHouse client",
+      "parent": "Overview",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "@housekit/orm Package",
+      "purpose": "Introduction to the ORM package - its role as the high-performance core for ClickHouse interaction, key features like RowBinary serialization and type safety",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Installation and Setup",
+      "purpose": "Guide users through installing the ORM package, basic setup, and creating their first database client connection",
+      "parent": "@housekit/orm Package",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Schema Definition",
+      "purpose": "Comprehensive guide to defining tables, columns, and engines using defineTable, the 't' type utility, and ClickHouse engine configurations",
+      "parent": "@housekit/orm Package",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Client Management and Connections",
+      "purpose": "Explain createClient, multi-database support, connection configuration, and how the ORM loads config from housekit.config.ts",
+      "parent": "@housekit/orm Package",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Query Building",
+      "purpose": "Document the query builder API for SELECT, INSERT, UPDATE, DELETE operations with type-safe DSL and SQL expression handling",
+      "parent": "@housekit/orm Package",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Relational Queries",
+      "purpose": "Deep dive into the Smart Relational API - how it uses groupArray for efficient one-to-many queries, join strategies, and nested relations",
+      "parent": "@housekit/orm Package",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Performance Optimizations",
+      "purpose": "Explain Turbo Mode (RowBinary serialization), background batching, binary encoders, and other performance features for high-throughput operations",
+      "parent": "@housekit/orm Package",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Advanced Features",
+      "purpose": "Cover dictionaries, materialized views, projections, and ClickHouse-specific features like ASOF JOIN and GLOBAL JOIN",
+      "parent": "@housekit/orm Package",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "@housekit/kit CLI",
+      "purpose": "Introduction to the CLI tool - its role in schema management, migrations, and developer workflows for ClickHouse",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "CLI Installation",
+      "purpose": "Guide for installing the CLI package and understanding its dependencies on the ORM",
+      "parent": "@housekit/kit CLI",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Project Initialization",
+      "purpose": "Detailed walkthrough of the 'housekit init' command - what it creates, how it sets up project structure, and the example schema",
+      "parent": "@housekit/kit CLI",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Configuration System",
+      "purpose": "Complete reference for housekit.config.ts - database connections, schema paths, environment variables, and multi-database setups",
+      "parent": "@housekit/kit CLI",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Development Workflow (Push)",
+      "purpose": "Explain the rapid development workflow using 'housekit push' for instant schema synchronization, when to use it, and its features",
+      "parent": "@housekit/kit CLI",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Production Workflow (Generate & Migrate)",
+      "purpose": "Document the controlled production workflow - 'housekit generate' for creating migrations, 'housekit migrate' for applying them, and snapshot.json",
+      "parent": "@housekit/kit CLI",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "CLI Commands Reference",
+      "purpose": "Comprehensive reference for all CLI commands - push, generate, migrate, pull, schema, status, validate, drop, truncate, reset, list, check",
+      "parent": "@housekit/kit CLI",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Database Introspection",
+      "purpose": "Guide to using 'housekit pull' to generate TypeScript schemas from existing ClickHouse databases",
+      "parent": "@housekit/kit CLI",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Cluster-Aware Operations",
+      "purpose": "Explain how HouseKit handles sharded ClickHouse clusters - onCluster configuration, {cluster} macros, and distributed operations",
+      "parent": "@housekit/kit CLI",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Blue-Green Migrations",
+      "purpose": "Detail the blue-green deployment strategy for zero-downtime schema changes, especially for materialized views",
+      "parent": "@housekit/kit CLI",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "CI/CD and Release Management",
+      "purpose": "Overview of HouseKit's automation infrastructure for publishing packages and managing versions",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Publishing Workflow",
+      "purpose": "Explain the GitHub Actions workflow for automated package publishing to npm, including triggers and the publish-if-new script",
+      "parent": "CI/CD and Release Management",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Version Management",
+      "purpose": "Document the bump-changed-versions script - how it detects changes, calculates version bumps, handles dependency chains, and updates package.json files",
+      "parent": "CI/CD and Release Management",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    }
+  ]
+}
